@@ -1,2 +1,8 @@
+.# 環境変数ファイル（秘密情報）
 .env
+
+# Node.jsの依存パッケージフォルダ
 node_modules/
+
+# GCP認証情報
+keihi-discord-bot-232654693810.json
