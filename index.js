@@ -1,8 +1,10 @@
+// index.js
 import http from 'http';
 import { Client, Collection, GatewayIntentBits } from 'discord.js';
 import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
+import { pathToFileURL } from 'url';
 
 dotenv.config();
 
@@ -32,15 +34,16 @@ client.commands = new Collection();
     for (const file of commandFiles) {
       try {
         const filePath = path.join(commandsPath, file);
-        const commandModule = await import(filePath);
+        const commandModule = await import(pathToFileURL(filePath).href);
         const command = commandModule.default ?? commandModule;
         if (command.data && command.execute) {
           client.commands.set(command.data.name, command);
+          console.log(`✅ コマンド読み込み成功: ${file}`);
         } else {
-          console.warn(`Invalid command module (missing data or execute): ${file}`);
+          console.warn(`⚠️ コマンド形式不正: ${file}`);
         }
       } catch (cmdErr) {
-        console.error(`Failed to load command ${file}:`, cmdErr);
+        console.error(`❌ コマンド読み込み失敗: ${file}`, cmdErr);
       }
     }
 
@@ -50,10 +53,10 @@ client.commands = new Collection();
     for (const file of eventFiles) {
       try {
         const filePath = path.join(eventsPath, file);
-        const eventModule = await import(filePath);
+        const eventModule = await import(pathToFileURL(filePath).href);
         const event = eventModule.default ?? eventModule;
         if (!event || !event.name || !event.execute) {
-          console.warn(`Invalid event module (missing name or execute): ${file}`);
+          console.warn(`⚠️ イベント形式不正: ${file}`);
           continue;
         }
         if (event.once) {
@@ -61,7 +64,7 @@ client.commands = new Collection();
             try {
               event.execute(...args);
             } catch (e) {
-              console.error(`Error executing once event ${event.name}:`, e);
+              console.error(`イベント処理エラー（once）: ${event.name}`, e);
             }
           });
         } else {
@@ -69,12 +72,13 @@ client.commands = new Collection();
             try {
               event.execute(...args);
             } catch (e) {
-              console.error(`Error executing event ${event.name}:`, e);
+              console.error(`イベント処理エラー: ${event.name}`, e);
             }
           });
         }
+        console.log(`✅ イベント読み込み成功: ${file}`);
       } catch (eventErr) {
-        console.error(`Failed to load event ${file}:`, eventErr);
+        console.error(`❌ イベント読み込み失敗: ${file}`, eventErr);
       }
     }
 
@@ -83,12 +87,12 @@ client.commands = new Collection();
       await client.login(process.env.DISCORD_TOKEN);
       console.log('Discord client logged in successfully.');
     } catch (loginErr) {
-      console.error('Discord client login failed:', loginErr);
+      console.error('Discord client login失敗:', loginErr);
       process.exit(1); // ログイン失敗時はプロセス終了も検討
     }
 
   } catch (err) {
-    console.error('Error during initial loading:', err);
+    console.error('初期ロードエラー:', err);
     process.exit(1);
   }
 })();
@@ -103,3 +107,4 @@ process.on('uncaughtException', (error) => {
   // 必要ならプロセス終了も
   // process.exit(1);
 });
+
