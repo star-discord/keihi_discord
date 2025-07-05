@@ -1,47 +1,32 @@
-# star-chat-gpt-discord-bot
+# STAR ChatGPT Discord Bot
 
-Discordで動作するChatGPT連携Botです。  
-Google Cloud Storageを利用して設定ファイルを永続化します。
+Discord上でChatGPTと自然に会話できる **STAR 管理Bot** です。  
+`@bot名` で話しかけると応答し、スラッシュコマンドで動作設定が可能です。
 
----
+## 🛠 機能概要
 
-## 機能概要
-
-- `/star_chat_gpt設定`  
-  管理者がChatGPTが反応するテキストチャンネルを指定します。
-
-- `/star_chat_gpt設置`  
-  管理者が指定したチャンネルに「今日のChatGPT」ボタン付き案内メッセージを設置します。  
-  既存の案内メッセージは自動で削除されます。
-
-- ボタン「今日のChatGPT」を押すと、  
-  - 今日の東京の天気  
-  - 最近のニュース  
-  - 面白い豆知識  
-  がChatGPTから生成されて返信されます。
+- `@bot名` によるメンション応答（OpenAI GPT-4 使用）
+- スラッシュコマンドでトリガー単語の設定が可能
+- `.env` による柔軟な設定
+- `PM2` によるプロセスマネジメント・永続起動対応
+- `update_bot.sh` による自動デプロイスクリプト
+- Discord Slash Command に完全対応
 
 ---
 
-## 環境構築
+## 📦 セットアップ手順
 
-### 必須環境
+### 1. 必要なもの
 
-- Node.js 18.x 以上
-- Discord Bot トークン
-- Google Cloud プロジェクト
-- Google Cloud Storage バケット
+- Node.js (v18以上)
+- Discord Bot のトークンと Client ID
+- OpenAI API キー（`https://platform.openai.com/`）
 
----
+### 2. 初期構築
 
-### 環境変数設定
+```bash
+git clone https://github.com/star-discord/chat_gpt_bot.git
+cd chat_gpt_bot/chat_gpt_bot
 
-`.env` ファイルなどで以下を設定してください。
-
-```env
-DISCORD_TOKEN=（Discord Botトークン）
-CLIENT_ID=（DiscordアプリケーションID）
-GOOGLE_SERVICE_ACCOUNT_EMAIL=（サービスアカウントのメールアドレス）
-GOOGLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n（改行は \n で）-----END PRIVATE KEY-----\n"
-PORT=3000
-BUCKET_NAME=star-chat-gpt-discord-bot
-OPENAI_API_KEY=（OpenAI APIキー）
+npm install
+cp .env.example .env  # 必要に応じて自作
