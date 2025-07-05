@@ -1,33 +1,25 @@
-import { SlashCommandBuilder } from 'discord.js';
-import { loadFromCloud } from '../utils/cloudStorage.js';  // 先に作成済みのCloud Storageユーティリティ
+const { SlashCommandBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
 
-export const data = new SlashCommandBuilder()
-  .setName('経費履歴')
-  .setDescription('過去の経費申請履歴を表示します');
+module.exports = {
+  data: new SlashCommandBuilder()
+    .setName('経費申請履歴')
+    .setDescription('自分の経費申請履歴を確認します（モーダル入力）'),
 
-export async function execute(interaction) {
-  await interaction.deferReply(); // 時間がかかる処理向けに defer
+  async execute(interaction) {
+    const modal = new ModalBuilder()
+      .setCustomId('expense_history_modal')
+      .setTitle('経費申請履歴の確認');
 
-  // Cloud Storageのファイルパス（例）
-  const filePath = 'keihi_data.json';
+    const yearMonthInput = new TextInputBuilder()
+      .setCustomId('yearMonth')
+      .setLabel('対象の年月または年月日 (例: 2025-07 または 2025-07-05)')
+      .setStyle(TextInputStyle.Short)
+      .setRequired(false);
 
-  const data = await loadFromCloud(filePath);
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(yearMonthInput)
+    );
 
-  if (!data || data.length === 0) {
-    await interaction.editReply('経費申請の履歴はまだありません。');
-    return;
+    await interaction.showModal(modal);
   }
-
-  // 最新30件を取得（降順）
-  const recentItems = data.slice(-30).reverse();
-
-  const lines = recentItems.map(item => {
-    const dateStr = new Date(item.timestamp).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' });
-    return `- ${dateStr} | <@${item.userId}> | ${item.expenseItem} | ${item.amount}円 | ${item.notes || '-'}`;
-  });
-
-  // Discordメッセージ長制限（約2000文字）に注意して分割も検討可
-  const message = '**📜 経費申請履歴（最新30件）**\n' + lines.join('\n');
-
-  await interaction.editReply(message);
-}
+};

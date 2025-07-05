@@ -1,110 +1,71 @@
-// index.js
-import http from 'http';
-import { Client, Collection, GatewayIntentBits } from 'discord.js';
-import dotenv from 'dotenv';
-import fs from 'fs';
-import path from 'path';
-import { pathToFileURL } from 'url';
+const http = require('http');
+const { Client, Collection, GatewayIntentBits } = require('discord.js');
+const dotenv = require('dotenv');
+const fs = require('fs');
+const path = require('path');
 
 dotenv.config();
 
 const port = process.env.PORT || 3000;
 
-// Render向けHTTPサーバ起動（ヘルスチェック用）
-const server = http.createServer((req, res) => {
-  res.writeHead(200);
-  res.end('Bot is running');
-});
-server.listen(port, () => {
-  console.log(`HTTP server listening on port ${port}`);
-});
-
 const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages],
 });
 
-// コマンドを格納するCollectionを用意
 client.commands = new Collection();
+
+// HTTP Server for Render / Cloud Run
+http.createServer((_, res) => {
+  res.writeHead(200);
+  res.end('Bot is running');
+}).listen(port, () => {
+  console.log(`HTTP server listening on port ${port}`);
+});
 
 (async () => {
   try {
-    // commandsフォルダ内のコマンドファイルをすべて読み込み
-    const commandsPath = path.resolve('./commands');
+    const commandsPath = path.join(__dirname, 'commands');
     const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
+
     for (const file of commandFiles) {
-      try {
-        const filePath = path.join(commandsPath, file);
-        const commandModule = await import(pathToFileURL(filePath).href);
-        const command = commandModule.default ?? commandModule;
-        if (command.data && command.execute) {
-          client.commands.set(command.data.name, command);
-          console.log(`✅ コマンド読み込み成功: ${file}`);
-        } else {
-          console.warn(`⚠️ コマンド形式不正: ${file}`);
-        }
-      } catch (cmdErr) {
-        console.error(`❌ コマンド読み込み失敗: ${file}`, cmdErr);
+      const command = require(path.join(commandsPath, file));
+      if (command.data && command.execute) {
+        client.commands.set(command.data.name, command);
+        console.log(`✅ コマンド読み込み成功: ${file}`);
+      } else {
+        console.warn(`⚠️ コマンド形式不正: ${file}`);
       }
     }
 
-    // eventsフォルダ内のイベントファイルをすべて読み込み
-    const eventsPath = path.resolve('./events');
+    const eventsPath = path.join(__dirname, 'events');
     const eventFiles = fs.readdirSync(eventsPath).filter(file => file.endsWith('.js'));
+
     for (const file of eventFiles) {
-      try {
-        const filePath = path.join(eventsPath, file);
-        const eventModule = await import(pathToFileURL(filePath).href);
-        const event = eventModule.default ?? eventModule;
-        if (!event || !event.name || !event.execute) {
-          console.warn(`⚠️ イベント形式不正: ${file}`);
-          continue;
-        }
-        if (event.once) {
-          client.once(event.name, (...args) => {
-            try {
-              event.execute(...args);
-            } catch (e) {
-              console.error(`イベント処理エラー（once）: ${event.name}`, e);
-            }
-          });
-        } else {
-          client.on(event.name, (...args) => {
-            try {
-              event.execute(...args);
-            } catch (e) {
-              console.error(`イベント処理エラー: ${event.name}`, e);
-            }
-          });
-        }
-        console.log(`✅ イベント読み込み成功: ${file}`);
-      } catch (eventErr) {
-        console.error(`❌ イベント読み込み失敗: ${file}`, eventErr);
+      const event = require(path.join(eventsPath, file));
+      if (!event || !event.name || !event.execute) continue;
+
+      if (event.once) {
+        client.once(event.name, (...args) => event.execute(...args));
+      } else {
+        client.on(event.name, (...args) => event.execute(...args));
       }
+
+      console.log(`✅ イベント読み込み成功: ${file}`);
     }
 
-    // Discordにログイン
-    try {
-      await client.login(process.env.DISCORD_TOKEN);
-      console.log('Discord client logged in successfully.');
-    } catch (loginErr) {
-      console.error('Discord client login失敗:', loginErr);
-      process.exit(1); // ログイン失敗時はプロセス終了も検討
-    }
-
+    await client.login(process.env.DISCORD_TOKEN);
+    console.log('Discord client logged in successfully.');
   } catch (err) {
     console.error('初期ロードエラー:', err);
     process.exit(1);
   }
 })();
 
-// 未処理例外のグローバルキャッチ
 process.on('unhandledRejection', (reason, promise) => {
   console.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });
 
-process.on('uncaughtException', (error) => {
+process.on('uncaughtException', error => {
   console.error('Uncaught Exception thrown:', error);
-  // 必要ならプロセス終了も
-  // process.exit(1);
 });
 

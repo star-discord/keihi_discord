@@ -7,11 +7,11 @@ import {
   ThreadAutoArchiveDuration,
   ButtonBuilder,
   ButtonStyle,
+  EmbedBuilder,
 } from 'discord.js';
 
 import { Storage } from '@google-cloud/storage';
 
-// GCPのバケット名とファイルパス（要適宜変更）
 const bucketName = 'keihi-discord-bot-data-948332309706';
 const fileName = 'keihi/expenses_all.json';
 
@@ -22,15 +22,13 @@ async function appendExpenseData(newEntry) {
     const file = storage.bucket(bucketName).file(fileName);
     let allData = {};
 
-    // 既存ファイルの有無チェック
     const [exists] = await file.exists();
     if (exists) {
       const contents = await file.download();
       allData = JSON.parse(contents[0].toString());
     }
 
-    const ym = newEntry.timestamp.slice(0, 7); // "YYYY-MM"
-
+    const ym = newEntry.timestamp.slice(0, 7);
     if (!allData[ym]) {
       allData[ym] = [];
     }
@@ -44,7 +42,7 @@ async function appendExpenseData(newEntry) {
     console.log('✅ 経費データをCloud Storageに追記しました');
   } catch (error) {
     console.error('❌ Cloud Storage保存エラー:', error);
-    throw error; // 失敗時は呼び出し元で処理可能に
+    throw error;
   }
 }
 
@@ -53,7 +51,6 @@ export default {
   async execute(interaction) {
     const client = interaction.client;
 
-    // チャットコマンド処理
     if (interaction.isChatInputCommand()) {
       const command = client.commands.get(interaction.commandName);
       if (!command) return;
@@ -71,7 +68,6 @@ export default {
       return;
     }
 
-    // ボタン押下時処理
     if (interaction.isButton()) {
       if (interaction.customId === 'expense_apply_button') {
         if (interaction.replied || interaction.deferred) return;
@@ -117,7 +113,6 @@ export default {
       return;
     }
 
-    // モーダル送信時処理
     if (interaction.isModalSubmit()) {
       if (interaction.customId === 'expense_apply_modal') {
         if (interaction.replied || interaction.deferred) return;
@@ -133,7 +128,6 @@ export default {
         }
 
         try {
-          // deferReplyで応答を保留しモーダルを閉じる
           await interaction.deferReply({ ephemeral: true });
 
           const now = new Date();
@@ -149,11 +143,7 @@ export default {
           }).replace(/\//g, '-');
 
           const threadName = `経費申請-${yearMonth}`;
-          let thread;
-
-          // スレッド取得 or 作成
-          const threads = await channel.threads.fetch();
-          thread = threads.threads.find(t => t.name === threadName);
+          let thread = (await channel.threads.fetch()).threads.find(t => t.name === threadName);
 
           if (!thread) {
             thread = await channel.threads.create({
@@ -163,7 +153,6 @@ export default {
             });
           }
 
-          // Cloud Storageにデータ保存
           try {
             await appendExpenseData({
               userId: interaction.user.id,
@@ -175,20 +164,16 @@ export default {
             });
           } catch (e) {
             console.error('Cloud Storage保存失敗:', e);
-            // 失敗しても申請はDiscord上に残す
           }
 
-          // スレッドに申請内容を投稿
           const threadMessage = await thread.send(
             `**経費申請**\n- 名前: <@${interaction.user.id}>\n- 経費項目: ${expenseItem}\n- 金額: ${amount} 円\n- 備考: ${notes}`
           );
 
-          // チャンネルに申請ログ投稿
           await channel.send(
             `経費申請しました。　${formattedDate}　${interaction.member?.displayName || interaction.user.username} (<@${interaction.user.id}>)　${threadMessage.url}`
           );
 
-          // 既存案内メッセージ削除（過去50件）
           try {
             const fetchedMessages = await channel.messages.fetch({ limit: 50 });
             for (const msg of fetchedMessages.values()) {
@@ -207,7 +192,6 @@ export default {
             console.error('案内メッセージ取得失敗:', err);
           }
 
-          // 新しい案内メッセージ送信
           const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder()
               .setCustomId('expense_apply_button')
@@ -220,7 +204,6 @@ export default {
             components: [row],
           });
 
-          // deferReplyの応答を編集（モーダル閉じて完了メッセージ）
           await interaction.editReply('経費申請を受け付けました。ありがとうございます。');
 
         } catch (e) {
@@ -231,6 +214,66 @@ export default {
         }
         return;
       }
+
+      if (interaction.customId === 'expenseHistoryModal') {
+        if (interaction.replied || interaction.deferred) return;
+
+        const yearMonth = interaction.fields.getTextInputValue('yearMonth')?.trim();
+        const userId = interaction.user.id;
+
+        try {
+          await interaction.deferReply({ ephemeral: true });
+
+          const file = storage.bucket(bucketName).file(fileName);
+          const [exists] = await file.exists();
+          if (!exists) {
+            await interaction.editReply('履歴ファイルが存在しません。');
+            return;
+          }
+
+          const contents = await file.download();
+          const allData = JSON.parse(contents[0].toString());
+
+          const entries = [];
+          for (const ym in allData) {
+            if (yearMonth && ym !== yearMonth) continue;
+            for (const entry of allData[ym]) {
+              if (entry.userId === userId) entries.push(entry);
+            }
+          }
+
+          if (entries.length === 0) {
+            await interaction.editReply('申請履歴が見つかりませんでした。');
+            return;
+          }
+
+          const lines = entries.map(entry => {
+            const date = new Date(entry.timestamp).toLocaleDateString('ja-JP');
+            return `📅 ${date}｜📌 ${entry.expenseItem}`;
+          });
+
+          const header = yearMonth ? `📄 ${yearMonth} の履歴` : `📄 申請履歴`;
+          const message = `${header}（${entries.length}件）\n${lines.join('\n')}`;
+
+          const thread = await interaction.channel.threads.create({
+            name: `申請履歴-${interaction.user.username}`,
+            autoArchiveDuration: ThreadAutoArchiveDuration.OneHour,
+            reason: '経費申請履歴確認',
+          });
+
+          await thread.send(`<@${userId}> さんの履歴：\n${message}`);
+
+          await interaction.editReply(`✅ 履歴を以下のスレッドに表示しました：\n${thread.url}`);
+
+        } catch (err) {
+          console.error('履歴取得エラー:', err);
+          await interaction.editReply('履歴の取得中にエラーが発生しました。');
+        }
+
+        return;
+      }
     }
   },
 };
+
+
