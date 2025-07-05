@@ -1,20 +1,51 @@
 #!/bin/bash
 
-BOT_NAME="chat_gpt_bot"
-WORK_DIR="/home/star_vesta_legion_kanri/chat_gpt_bot/chat_gpt_bot"
+echo "📦 Bot 更新処理を開始..."
 
-cd "$WORK_DIR"
-echo "📦 最新コードを反映中..."
-git pull origin main
+# PM2 Bot 停止
+echo "🛑 Bot 停止..."
+pm2 stop chat_gpt_bot
 
-if [ -f package.json ]; then
-  echo "📦 npm install 実行中..."
-  npm install
+# 古い Bot フォルダ削除
+echo "🧹 古いフォルダ削除..."
+rm -rf ~/chat_gpt_bot
+
+# ZIP 解凍（中間ディレクトリに一旦展開）
+echo "📂 ZIP 解凍..."
+unzip -q ~/chat_gpt_bot.zip -d ~/chat_gpt_bot_tmp
+
+# chat_gpt_bot フォルダが入れ子になっているのを修正
+mv ~/chat_gpt_bot_tmp/chat_gpt_bot ~/chat_gpt_bot
+rm -rf ~/chat_gpt_bot_tmp
+
+# ZIP 削除
+echo "🗑️ ZIP 削除..."
+rm -f ~/chat_gpt_bot.zip
+
+# コマンド再デプロイ & 依存パッケージのインストール
+echo "📡 コマンド再デプロイ & 依存パッケージインストール..."
+cd ~/chat_gpt_bot
+
+# package.json 存在チェック
+if [ ! -f "package.json" ]; then
+  echo "❌ package.json が見つかりません。"
+  exit 1
 fi
 
-echo "🚀 PM2でBot再起動中..."
-pm2 restart "$BOT_NAME"
-echo "💾 PM2設定保存中..."
+# npm install
+npm install
+
+# deploy-commands.js 実行
+if [ -f "deploy-commands.js" ]; then
+  node deploy-commands.js
+else
+  echo "⚠️ deploy-commands.js が見つかりません。スキップします。"
+fi
+
+# PM2 再起動
+echo "🚀 PM2 再起動..."
+pm2 start index.js --name chat_gpt_bot
 pm2 save
 
-echo "✅ 更新完了: $BOT_NAME"
+echo "✅ Bot 更新完了 🎉"
+
