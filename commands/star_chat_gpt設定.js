@@ -4,15 +4,8 @@ const { SlashCommandBuilder } = require('discord.js');
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('star_chat_gpt設定')
-    .setDescription('ChatGPTの応答設定をします')
-    .addStringOption(option =>
-      option.setName('system')
-        .setDescription('Systemプロンプト')
-        .setRequired(true)),
+    .setDescription('STAR ChatGPT の設定を表示または変更します'),
   async execute(interaction) {
-    const systemPrompt = interaction.options.getString('system');
-    const fs = require('fs');
-    fs.writeFileSync('./data/gpt_system_prompt.txt', systemPrompt);
-    await interaction.reply({ content: '✅ 応答設定を保存しました。', ephemeral: true });
+    await interaction.reply('設定コマンドは現在準備中です。');
   }
 };
