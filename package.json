@@ -1,27 +1,22 @@
 {
-  "name": "discord-keihi-bot",
-  "version": "0.2.1",
-  "description": "Discord 経費・ChatGPT Bot",
+  "name": "star-chatgpt-discord-bot",
+  "version": "0.1.1",
+  "description": "STAR ChatGPT Discord Bot",
   "main": "index.js",
+  "type": "module",
   "scripts": {
     "start": "node index.js",
-    "deploy-commands": "node deploy-commands.js",
-    "pm2-start": "pm2 start ecosystem.config.cjs",
-    "pm2-restart": "pm2 restart ecosystem.config.cjs"
+    "deploy": "node deploy-commands.js"
   },
   "engines": {
     "node": ">=18"
   },
-  "type": "commonjs",
   "dependencies": {
-    "@google-cloud/storage": "^7.16.0",
-    "discord.js": "^14.21.2",
-    "dotenv": "^16.3.1",
-    "googleapis": "^133.0.0"
+    "@google-cloud/storage": "^7.25.0",
+    "discord.js": "^14.21.3",
+    "dotenv": "^16.4.5",
+    "openai": "^4.24.0"
   },
-  "devDependencies": {
-    "pm2": "^5.3.0"
-  },
-  "author": "redstar hr <redstar.hoshir@gmail.com>",
+  "author": "RedStar HR <redstar.hoshir@gmail.com>",
   "license": "MIT"
 }
