@@ -1,21 +1,19 @@
-// deploy-commands.js
-import { REST, Routes } from 'discord.js';
-import { config } from 'dotenv';
-import fs from 'fs/promises';
-import path from 'path';
-import { fileURLToPath } from 'url';
+// deploy-commands.js (CommonJS版)
+const { REST, Routes } = require('discord.js');
+const dotenv = require('dotenv');
+const fs = require('fs');
+const path = require('path');
 
-config();
+dotenv.config();
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const commands = [];
 
-async function loadCommands() {
+function loadCommands() {
   const commandsPath = path.join(__dirname, 'commands');
   let commandFiles;
 
   try {
-    commandFiles = (await fs.readdir(commandsPath)).filter(file => file.endsWith('.js'));
+    commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
   } catch (err) {
     console.error('❌ コマンドディレクトリ読み込みエラー:', err);
     return;
@@ -24,10 +22,11 @@ async function loadCommands() {
   for (const file of commandFiles) {
     const filePath = path.join(commandsPath, file);
     try {
-      const commandModule = await import(`file://${filePath}`);
-      const command = commandModule.default ?? commandModule;
-      if (command?.data?.toJSON) {
-        commands.push(command.data.toJSON());
+      const command = require(filePath);
+      const commandData = command.default ?? command;
+
+      if (commandData?.data?.toJSON) {
+        commands.push(commandData.data.toJSON());
         console.log(`✅ コマンド読み込み成功: ${file}`);
       } else {
         console.warn(`⚠️ 無効なコマンド形式: ${file}`);
@@ -40,7 +39,8 @@ async function loadCommands() {
 
 async function deployCommands() {
   const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
-  await loadCommands();
+
+  loadCommands();
 
   const isDevelopment = Boolean(process.env.GUILD_ID);
 
@@ -57,4 +57,5 @@ async function deployCommands() {
 }
 
 deployCommands();
+
 
