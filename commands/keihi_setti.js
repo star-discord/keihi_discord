@@ -1,3 +1,5 @@
+// commands/keihi_setti.js
+
 const {
   SlashCommandBuilder,
   ActionRowBuilder,
@@ -52,12 +54,12 @@ module.exports = {
     // ✅ ボタンとメッセージ送信
     try {
       const applyButton = new ButtonBuilder()
-        .setCustomId('expense_apply_button')
+        .setCustomId('apply') // ✅ 修正: expense_apply_button → apply
         .setLabel('経費申請する')
         .setStyle(ButtonStyle.Primary);
 
       const approveButton = new ButtonBuilder()
-        .setCustomId('approve_button')
+        .setCustomId('approve') // ✅ 修正: approve_button → approve
         .setLabel('✅ 承認')
         .setStyle(ButtonStyle.Success);
 
@@ -79,4 +81,3 @@ module.exports = {
     }
   }
 };
-

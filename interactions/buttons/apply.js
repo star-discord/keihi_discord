@@ -1,4 +1,4 @@
-//expense_apply_button
+//apply
 
 const {
   ModalBuilder,
