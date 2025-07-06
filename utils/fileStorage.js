@@ -1,126 +1,158 @@
 const fs = require('fs');
 const path = require('path');
 
-const BASE_DIR = path.join(__dirname, '..', 'data');
+// ────────── ベースディレクトリ ──────────
+const BASE_DIR = path.join(__dirname, '..', 'data', 'keihi');
 
+function ensureDirExists(dirPath) {
+  if (!fs.existsSync(dirPath)) {
+    fs.mkdirSync(dirPath, { recursive: true });
+  }
+}
+
+// ────────── パス取得 ──────────
 function getGuildDir(guildId) {
   return path.join(BASE_DIR, guildId);
 }
 
-function getGuildFilePath(guildId) {
-  return path.join(getGuildDir(guildId), `${guildId}.json`);
+function getConfigPath(guildId) {
+  return path.join(getGuildDir(guildId), 'config.json');
 }
 
-function getExpenseLogPath(guildId, yearMonth) {
-  return path.join(getGuildDir(guildId), `${yearMonth}.json`);
+function getLogPath(guildId, yearMonth) {
+  return path.join(getGuildDir(guildId), 'logs', `${yearMonth}.json`);
 }
 
-// ✅ 共通JSON読み込み関数（失敗時は fallback を返す）
-function readJson(filePath, fallback = []) {
+// ────────── JSON読み書き ──────────
+function safeReadJson(filePath, fallback) {
   try {
     if (!fs.existsSync(filePath)) return fallback;
-    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    const raw = fs.readFileSync(filePath, 'utf8');
+    const parsed = JSON.parse(raw);
+
+    if (Array.isArray(fallback) && !Array.isArray(parsed)) return fallback;
+    if (typeof fallback === 'object' && !Array.isArray(fallback) && typeof parsed !== 'object') return fallback;
+
+    return parsed;
   } catch (err) {
-    console.error(`❌ JSON読み込み失敗 (${filePath}):`, err);
+    console.error(`❌ JSON読み込み失敗: ${filePath}:`, err);
     return fallback;
   }
 }
 
-function loadGuildData(guildId) {
-  const filePath = getGuildFilePath(guildId);
+function saveJson(filePath, data) {
+  ensureDirExists(path.dirname(filePath));
   try {
-    if (!fs.existsSync(getGuildDir(guildId))) {
-      fs.mkdirSync(getGuildDir(guildId), { recursive: true });
-    }
-    if (!fs.existsSync(filePath)) {
-      fs.writeFileSync(filePath, JSON.stringify({}, null, 2));
-      return {};
-    }
-    return readJson(filePath, {});
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
   } catch (err) {
-    console.error(`❌ ギルド設定読み込みエラー (${guildId}):`, err);
-    return {};
+    console.error(`❌ JSON保存失敗: ${filePath}:`, err);
   }
+}
+
+// ────────── ギルド設定 ──────────
+function loadGuildData(guildId) {
+  return safeReadJson(getConfigPath(guildId), {});
 }
 
 function saveGuildData(guildId, data) {
-  const filePath = getGuildFilePath(guildId);
-  try {
-    fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
-  } catch (err) {
-    console.error(`❌ ギルド設定保存エラー (${guildId}):`, err);
-  }
+  saveJson(getConfigPath(guildId), data);
 }
 
 function getApproverRoles(guildId) {
-  const data = loadGuildData(guildId);
-  return data.approverRoles || [];
+  const config = loadGuildData(guildId);
+  return config.approverRoles || [];
 }
 
 function setApproverRoles(guildId, roles) {
-  const data = loadGuildData(guildId);
-  data.approverRoles = roles;
-  saveGuildData(guildId, data);
+  const config = loadGuildData(guildId);
+  config.approverRoles = roles;
+  saveGuildData(guildId, config);
 }
 
-function appendExpenseLog(guildId, yearMonth, newEntry) {
-  const logPath = getExpenseLogPath(guildId, yearMonth);
-  const data = readJson(logPath, []);
-  data.push(newEntry);
-  try {
-    fs.writeFileSync(logPath, JSON.stringify(data, null, 2));
-  } catch (err) {
-    console.error(`❌ 経費ログ保存エラー (${guildId}/${yearMonth}):`, err);
-  }
+// ────────── 経費ログ ──────────
+function appendExpenseLog(guildId, yearMonth, entry) {
+  const path = getLogPath(guildId, yearMonth);
+  const list = safeReadJson(path, []);
+  list.push(entry);
+  saveJson(path, list);
 }
 
 function getExpenseEntries(guildId, yearMonth, userId = null) {
-  const logPath = getExpenseLogPath(guildId, yearMonth);
-  const entries = readJson(logPath, []);
-  return userId ? entries.filter(e => e.userId === userId) : entries;
+  const list = safeReadJson(getLogPath(guildId, yearMonth), []);
+  return userId ? list.filter(e => e.userId === userId) : list;
+}
+
+function getUserExpenseEntries(guildId, yearMonth, userId) {
+  return getExpenseEntries(guildId, yearMonth, userId);
 }
 
 function updateApprovalStatus(guildId, yearMonth, threadMessageId, userId, username) {
-  const logPath = getExpenseLogPath(guildId, yearMonth);
-  const data = readJson(logPath, []);
-  const target = data.find(e => e.threadMessageId === threadMessageId);
-  if (!target) return [];
+  const logPath = getLogPath(guildId, yearMonth);
+  const entries = safeReadJson(logPath, []);
+  const entry = entries.find(e => e.threadMessageId === threadMessageId);
+  if (!entry) return null;
 
-  if (!target.approvedBy) target.approvedBy = [];
+  if (!entry.approvedBy) entry.approvedBy = [];
 
-  const alreadyApproved = target.approvedBy.find(a => a.userId === userId);
-  if (!alreadyApproved) {
-    target.approvedBy.push({ userId, username });
-    try {
-      fs.writeFileSync(logPath, JSON.stringify(data, null, 2));
-    } catch (err) {
-      console.error(`❌ 承認保存エラー (${guildId}/${yearMonth}):`, err);
-    }
+  const already = entry.approvedBy.find(a => a.userId === userId);
+  if (!already) {
+    entry.approvedBy.push({ userId, username });
+    saveJson(logPath, entries);
   }
 
-  return target.approvedBy;
+  return entry.approvedBy;
+}
+
+function deleteExpenseEntry(guildId, yearMonth, messageId) {
+  const logPath = getLogPath(guildId, yearMonth);
+  const entries = safeReadJson(logPath, []);
+  const filtered = entries.filter(e => e.threadMessageId !== messageId);
+  if (filtered.length !== entries.length) {
+    saveJson(logPath, filtered);
+    return true;
+  }
+  return false;
+}
+
+function editExpenseEntry(guildId, yearMonth, messageId, newData) {
+  const logPath = getLogPath(guildId, yearMonth);
+  const entries = safeReadJson(logPath, []);
+  const entry = entries.find(e => e.threadMessageId === messageId);
+  if (!entry) return false;
+
+  Object.assign(entry, newData);
+  saveJson(logPath, entries);
+  return true;
 }
 
 function getAvailableExpenseFiles(guildId) {
-  const dirPath = getGuildDir(guildId);
+  const logDir = path.join(getGuildDir(guildId), 'logs');
   try {
-    if (!fs.existsSync(dirPath)) return [];
-    return fs.readdirSync(dirPath)
-      .filter(name => /^\d{4}-\d{2}\.json$/.test(name))
-      .map(name => name.replace('.json', ''));
+    if (!fs.existsSync(logDir)) return [];
+    return fs.readdirSync(logDir)
+      .filter(f => /^\d{4}-\d{2}\.json$/.test(f))
+      .map(f => f.replace('.json', ''));
   } catch (err) {
-    console.error(`❌ ファイル一覧取得エラー (${guildId}):`, err);
+    console.error(`❌ ログファイル一覧取得失敗: ${guildId}:`, err);
     return [];
   }
 }
 
+// ────────── Export ──────────
 module.exports = {
+  // 設定
   loadGuildData,
   saveGuildData,
   getApproverRoles,
   setApproverRoles,
+
+  // ログ処理
   appendExpenseLog,
   getExpenseEntries,
+  getUserExpenseEntries,
   updateApprovalStatus,
+  deleteExpenseEntry,
+  editExpenseEntry,
   getAvailableExpenseFiles
 };
+

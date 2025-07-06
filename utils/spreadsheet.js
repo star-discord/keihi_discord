@@ -5,45 +5,57 @@ require('dotenv').config();
 
 const SCOPES = ['https://www.googleapis.com/auth/spreadsheets'];
 
-const getSheetAuth = () => new google.auth.GoogleAuth({
-  keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS,
-  scopes: SCOPES
-});
+const getSheetAuth = () =>
+  new google.auth.GoogleAuth({
+    keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS,
+    scopes: SCOPES
+  });
 
-function getSpreadsheetMapPath(guildId) {
-  return path.join('data', guildId, 'spreadsheet_map.json');
+// ────────── ファイルパスユーティリティ ──────────
+const BASE_DIR = path.join(__dirname, '..', 'data', 'keihi');
+
+function getGuildDir(guildId) {
+  return path.join(BASE_DIR, guildId);
 }
 
-function ensureDir(dir) {
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
+function getSpreadsheetMapPath(guildId) {
+  return path.join(getGuildDir(guildId), 'spreadsheet_map.json');
+}
+
+function ensureDir(dirPath) {
+  if (!fs.existsSync(dirPath)) {
+    fs.mkdirSync(dirPath, { recursive: true });
   }
 }
 
+// ────────── マップの読み書き ──────────
 function readSpreadsheetMap(guildId) {
-  const mapPath = getSpreadsheetMapPath(guildId);
-  if (!fs.existsSync(mapPath)) return {};
+  const filePath = getSpreadsheetMapPath(guildId);
   try {
-    return JSON.parse(fs.readFileSync(mapPath, 'utf8'));
+    if (!fs.existsSync(filePath)) return {};
+    const raw = fs.readFileSync(filePath, 'utf8');
+    return JSON.parse(raw);
   } catch (err) {
-    console.error(`❌ マップファイル読込失敗 (${mapPath}):`, err);
+    console.error(`❌ スプレッドマップ読み込み失敗 (${filePath}):`, err);
     return {};
   }
 }
 
 function writeSpreadsheetMap(guildId, map) {
-  const mapPath = getSpreadsheetMapPath(guildId);
+  const filePath = getSpreadsheetMapPath(guildId);
   try {
-    ensureDir(path.dirname(mapPath));
-    fs.writeFileSync(mapPath, JSON.stringify(map, null, 2));
+    ensureDir(path.dirname(filePath));
+    fs.writeFileSync(filePath, JSON.stringify(map, null, 2), 'utf8');
   } catch (err) {
-    console.error(`❌ マップファイル保存失敗 (${mapPath}):`, err);
+    console.error(`❌ スプレッドマップ保存失敗 (${filePath}):`, err);
   }
 }
 
+// ────────── スプレッドシート作成 ──────────
 async function createSpreadsheetForGuild(guildId, yearMonth) {
   const auth = getSheetAuth();
   const sheets = google.sheets({ version: 'v4', auth });
+
   const title = `経費申請ログ_${guildId}_${yearMonth}`;
 
   try {
@@ -57,10 +69,10 @@ async function createSpreadsheetForGuild(guildId, yearMonth) {
     map[yearMonth] = spreadsheetId;
     writeSpreadsheetMap(guildId, map);
 
-    console.log(`✅ スプレッドシート作成成功: ${title}`);
+    console.log(`✅ スプレッドシート作成: ${title}`);
     return spreadsheetId;
   } catch (err) {
-    console.error(`❌ スプレッドシート作成失敗:`, err);
+    console.error('❌ スプレッドシート作成エラー:', err);
     throw err;
   }
 }
@@ -70,6 +82,7 @@ function getSpreadsheetIdForGuild(guildId, yearMonth) {
   return map[yearMonth] || null;
 }
 
+// ────────── 経費データ書き込み ──────────
 async function writeExpensesToSpreadsheet(guildId, yearMonth, entries) {
   const auth = getSheetAuth();
   const sheets = google.sheets({ version: 'v4', auth });
@@ -90,9 +103,9 @@ async function writeExpensesToSpreadsheet(guildId, yearMonth, entries) {
     values.push([
       date,
       e.username || e.userId,
-      e.expenseItem,
-      e.amount,
-      e.notes,
+      e.expenseItem || '',
+      e.amount || '',
+      e.notes || '',
       approvers
     ]);
   }
@@ -105,14 +118,15 @@ async function writeExpensesToSpreadsheet(guildId, yearMonth, entries) {
       resource: { values }
     });
 
-    console.log(`✅ スプレッドシートへ書き込み完了: ${spreadsheetId}`);
+    console.log(`✅ 経費データ書き込み完了: ${spreadsheetId}`);
     return spreadsheetId;
   } catch (err) {
-    console.error(`❌ スプレッドシート書き込み失敗:`, err);
+    console.error('❌ スプレッドシート書き込みエラー:', err);
     throw err;
   }
 }
 
+// ────────── Export ──────────
 module.exports = {
   createSpreadsheetForGuild,
   getSpreadsheetIdForGuild,

@@ -3,6 +3,7 @@ const {
   ButtonStyle,
   ActionRowBuilder
 } = require('discord.js');
+
 const {
   getApproverRoles,
   updateApprovalStatus
@@ -12,7 +13,7 @@ module.exports = async function handleApproveButton(interaction) {
   const guildId = interaction.guildId;
   const member = interaction.member;
   const userId = interaction.user.id;
-  const username = interaction.user.username;
+  const username = interaction.user.globalName || interaction.user.username;
 
   // ✅ ロールチェック
   const approverRoles = getApproverRoles(guildId);
@@ -25,7 +26,7 @@ module.exports = async function handleApproveButton(interaction) {
     });
   }
 
-  // ✅ メッセージIDと日時から対象年月を抽出
+  // ✅ メッセージIDと年月取得
   const messageId = interaction.message.id;
   const createdAt = interaction.message.createdAt;
   const yearMonth = createdAt.toISOString().slice(0, 7);
@@ -33,21 +34,27 @@ module.exports = async function handleApproveButton(interaction) {
   // ✅ 承認ステータス更新
   const approvedBy = updateApprovalStatus(guildId, yearMonth, messageId, userId, username);
 
-  // ✅ 表示更新：人数/最大数、ユーザー名一覧
+  // ✅ 表示文作成
   const approverNames = approvedBy.map(a => a.username).join(', ');
-  const content = `✅ 承認 (${approvedBy.length}/${approverRoles.length})：${approverNames}`;
+  const max = approverRoles.length || 1; // 0 件のときに分母を 1 に
+  const newContent = `✅ 承認 (${approvedBy.length}/${max})：${approverNames}`;
 
   try {
     await interaction.update({
-      content,
-      components: interaction.message.components // ボタンそのまま
+      content: newContent,
+      components: interaction.message.components
     });
   } catch (err) {
     console.error('❌ 承認メッセージ更新失敗:', err);
-    await interaction.reply({
-      content: '⚠️ 承認処理に失敗しました。',
-      ephemeral: true
-    });
+    try {
+      await interaction.reply({
+        content: '⚠️ 承認処理に失敗しました。',
+        ephemeral: true
+      });
+    } catch (e) {
+      console.error('❌ 応答メッセージ送信失敗:', e);
+    }
   }
 };
+
 

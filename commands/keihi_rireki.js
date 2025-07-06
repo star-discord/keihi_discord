@@ -15,22 +15,23 @@ module.exports = {
     try {
       const guildId = interaction.guildId;
 
-      const files = getAvailableExpenseFiles(guildId);
+      // logs/ 下のファイル名一覧（yyyy-mm）
+      const yearMonthList = getAvailableExpenseFiles(guildId);
 
-      if (!files || files.length === 0) {
+      if (!yearMonthList || yearMonthList.length === 0) {
         return await interaction.reply({
           content: '📁 経費申請の履歴ファイルが見つかりませんでした。',
           ephemeral: true
         });
       }
 
-      const options = files.map(ym => ({
+      const options = yearMonthList.map(ym => ({
         label: ym,
         value: ym
       }));
 
       const select = new StringSelectMenuBuilder()
-        .setCustomId('select_expense_history')
+        .setCustomId('history_year_month')
         .setPlaceholder('確認したい年月を選択')
         .addOptions(options);
 

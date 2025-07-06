@@ -16,7 +16,7 @@ module.exports = {
   async execute(interaction) {
     const channel = interaction.channel;
 
-    // ✅ テキストチャンネルでなければ中止
+    // ✅ テキストチャンネルでなければ終了
     if (!channel || channel.type !== ChannelType.GuildText) {
       return interaction.reply({
         content: 'このコマンドはテキストチャンネルでのみ使用できます。',
@@ -24,28 +24,36 @@ module.exports = {
       });
     }
 
+    // ✅ 承認ロール取得（存在しない場合も許容）
+    const approverRoles = getApproverRoles(interaction.guildId) || [];
+    if (approverRoles.length === 0) {
+      console.warn(`[警告] ギルド ${interaction.guildId} に承認ロールが未設定です`);
+    }
+
     try {
-      // ✅ 同様の案内が既にあれば削除
+      // ✅ 過去の案内メッセージを削除
       const messages = await channel.messages.fetch({ limit: 50 });
+
       for (const msg of messages.values()) {
         if (
           msg.author.id === interaction.client.user.id &&
           msg.content.includes('経費申請をする場合は以下のボタンを押してください。')
         ) {
-          await msg.delete().catch(console.error);
+          await msg.delete();
+          console.log(`🗑️ 過去の案内メッセージ削除: ${msg.id}`);
         }
       }
+    } catch (err) {
+      console.error('❌ 過去メッセージ削除時のエラー:', err);
+    }
 
-      // ✅ 承認ロール取得（存在しない場合は空配列）
-      const approverRoles = getApproverRoles(interaction.guildId) || [];
-
-      // ✅ 申請者用ボタン
+    try {
+      // ✅ ボタン作成
       const applyButton = new ButtonBuilder()
         .setCustomId('expense_apply_button')
         .setLabel('経費申請する')
         .setStyle(ButtonStyle.Primary);
 
-      // ✅ 承認者用ボタン（表示制御は `interactionCreate.js` 側で）
       const approveButton = new ButtonBuilder()
         .setCustomId('approve_button')
         .setLabel('✅ 承認')
@@ -59,8 +67,10 @@ module.exports = {
         components: [row]
       });
 
+      console.log(`[設置] 経費申請ボタンを送信しました in ${interaction.guildId} / #${channel.name}`);
+
     } catch (err) {
-      console.error('❌ 経費申請設置時のエラー:', err);
+      console.error('❌ 経費申請ボタン送信エラー:', err);
       await interaction.reply({
         content: '⚠️ 経費申請の案内設置に失敗しました。',
         ephemeral: true

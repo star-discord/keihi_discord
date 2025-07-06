@@ -9,23 +9,23 @@ module.exports = async function handleApplyButton(interaction) {
   try {
     const modal = new ModalBuilder()
       .setCustomId('expense_apply_modal')
-      .setTitle('経費申請フォーム');
+      .setTitle('📋 経費申請フォーム');
 
     const itemInput = new TextInputBuilder()
       .setCustomId('item')
-      .setLabel('申請内容')
+      .setLabel('申請項目（例：交通費、備品など）')
       .setStyle(TextInputStyle.Short)
       .setRequired(true);
 
     const amountInput = new TextInputBuilder()
       .setCustomId('amount')
-      .setLabel('金額（例：30000）')
+      .setLabel('金額（半角数字のみ）')
       .setStyle(TextInputStyle.Short)
       .setRequired(true);
 
     const detailInput = new TextInputBuilder()
       .setCustomId('detail')
-      .setLabel('詳細・用途（任意）')
+      .setLabel('用途・詳細（任意）')
       .setStyle(TextInputStyle.Paragraph)
       .setRequired(false);
 
@@ -33,14 +33,21 @@ module.exports = async function handleApplyButton(interaction) {
     const row2 = new ActionRowBuilder().addComponents(amountInput);
     const row3 = new ActionRowBuilder().addComponents(detailInput);
 
-    await interaction.showModal(modal.addComponents(row1, row2, row3));
+    modal.addComponents(row1, row2, row3);
+
+    await interaction.showModal(modal);
   } catch (err) {
-    console.error('❌ 経費申請モーダル表示エラー:', err);
-    await interaction.reply({
-      content: 'モーダルの表示に失敗しました。',
-      ephemeral: true
-    });
+    console.error('❌ モーダル表示中にエラーが発生:', err);
+    if (interaction.replied || interaction.deferred) {
+      await interaction.followUp({
+        content: '⚠️ モーダルの表示に失敗しました。',
+        ephemeral: true
+      });
+    } else {
+      await interaction.reply({
+        content: '⚠️ モーダルの表示に失敗しました。',
+        ephemeral: true
+      });
+    }
   }
 };
-
-
