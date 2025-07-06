@@ -1,28 +1,41 @@
+// interactions/buttons/cancel.js
+
 const { deleteExpenseEntry } = require('../../utils/fileStorage');
+const dayjs = require('dayjs');
 
-module.exports = async function handleCancel(interaction) {
+module.exports = async function handleCancelButton(interaction) {
+  if (!interaction.isButton() || interaction.customId !== 'cancel_button') return;
+
   try {
-    const guildId = interaction.guildId;
     const userId = interaction.user.id;
+    const guildId = interaction.guildId;
     const message = interaction.message;
+    const messageId = message.id;
+    const yearMonth = dayjs().format('YYYY-MM');
 
-    const thread = message.thread;
-    if (!thread) return interaction.reply({ content: '⚠️ スレッドが見つかりません。', ephemeral: true });
+    // ✅ ログファイルから申請を取得して、ユーザー本人のものか確認
+    const success = deleteExpenseEntry(guildId, yearMonth, messageId);
 
-    const yearMonth = thread.name.match(/\d{4}-\d{2}/)?.[0];
-    if (!yearMonth) return interaction.reply({ content: '⚠️ スレッド名から年月を取得できません。', ephemeral: true });
-
-    const deleted = deleteExpenseEntry(guildId, yearMonth, message.id);
-    if (deleted) {
-      await message.delete().catch(() => null);
-      await interaction.reply({ content: '🗑️ 経費申請を取り消しました。', ephemeral: true });
-    } else {
-      await interaction.reply({ content: '⚠️ データが見つからなかったため、取り消しできませんでした。', ephemeral: true });
+    if (!success) {
+      return interaction.reply({
+        content: '❌ この申請は取り消せません（他の人の申請か、ログに存在しません）。',
+        ephemeral: true
+      });
     }
+
+    // ✅ メッセージを削除
+    await message.delete().catch(console.error);
+
+    await interaction.reply({
+      content: '🗑️ 経費申請を取り消しました。',
+      ephemeral: true
+    });
+
   } catch (err) {
-    console.error('❌ 申請取り消しエラー:', err);
-    await interaction.reply({ content: 'エラーが発生しました。', ephemeral: true });
+    console.error('❌ 取り消し処理エラー:', err);
+    await interaction.reply({
+      content: '⚠️ 申請の取り消しに失敗しました。',
+      ephemeral: true
+    });
   }
 };
-
-

@@ -9,7 +9,7 @@ module.exports = async function handleHistorySelect(interaction) {
   const yearMonth = interaction.values[0];
 
   try {
-    // ✅ 履歴データ取得（そのユーザーの分のみ）
+    // ✅ 対象ユーザーの履歴取得
     const entries = getExpenseEntries(guildId, yearMonth, userId);
 
     if (!entries.length) {
@@ -19,7 +19,7 @@ module.exports = async function handleHistorySelect(interaction) {
       });
     }
 
-    // ✅ スレッドを生成して履歴投稿
+    // ✅ プライベートスレッド作成
     const thread = await interaction.channel.threads.create({
       name: `${yearMonth}の経費申請履歴 - ${interaction.user.username}`,
       autoArchiveDuration: 1440,
@@ -27,12 +27,14 @@ module.exports = async function handleHistorySelect(interaction) {
     });
 
     for (const entry of entries) {
-      const approvers = entry.approvedBy?.length
-        ? `✅ 承認済 (${entry.approvedBy.length})：${entry.approvedBy.map(a => a.username).join(', ')}`
+      const approverText = (entry.approvedBy?.length)
+        ? `✅ 承認 (${entry.approvedBy.length})：${entry.approvedBy.map(a => a.username).join(', ')}`
         : '❌ 未承認';
 
+      const formattedAmount = entry.amount?.toLocaleString?.() ?? entry.amount ?? 'N/A';
+
       await thread.send({
-        content: `📌 **${entry.item}**（¥${entry.amount}）\n🗓️ ${entry.timestamp}\n📝 ${entry.detail}\n${approvers}`
+        content: `📌 **${entry.item || '（不明）'}**（¥${formattedAmount}）\n🗓️ ${entry.timestamp || '日時不明'}\n📝 ${entry.detail || '（詳細なし）'}\n${approverText}`
       });
     }
 

@@ -5,6 +5,7 @@ const {
 } = require('discord.js');
 
 const { getAvailableExpenseFiles } = require('../utils/fileStorage');
+const MESSAGES = require('../constants/messages');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -15,12 +16,12 @@ module.exports = {
     try {
       const guildId = interaction.guildId;
 
-      // logs/ 下のファイル名一覧（yyyy-mm）
+      // ✅ ログファイル（yyyy-mm）の一覧取得
       const yearMonthList = getAvailableExpenseFiles(guildId);
 
       if (!yearMonthList || yearMonthList.length === 0) {
         return await interaction.reply({
-          content: '📁 経費申請の履歴ファイルが見つかりませんでした。',
+          content: MESSAGES.HISTORY_FILE_NOT_FOUND,
           ephemeral: true
         });
       }
@@ -38,17 +39,17 @@ module.exports = {
       const row = new ActionRowBuilder().addComponents(select);
 
       await interaction.reply({
-        content: '📅 確認したい年月を選択してください：',
+        content: MESSAGES.HISTORY_SELECT_PROMPT,
         components: [row],
         ephemeral: true
       });
+
     } catch (err) {
       console.error('❌ 経費申請履歴コマンド実行中にエラー:', err);
       await interaction.reply({
-        content: '⚠️ エラーが発生しました。管理者にお問い合わせください。',
+        content: MESSAGES.ERROR_OCCURRED,
         ephemeral: true
       });
     }
   }
 };
-

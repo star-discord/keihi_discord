@@ -11,6 +11,8 @@ const {
   setVisibleRoles
 } = require('../utils/fileStorage');
 
+const MESSAGES = require('../constants/messages');
+
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('経費申請設定')
@@ -35,7 +37,7 @@ module.exports = {
       const row2 = new ActionRowBuilder().addComponents(visibleMenu);
 
       await interaction.reply({
-        content: '設定したいロールを選択してください：',
+        content: MESSAGES.ROLE.PROMPT,
         components: [row1, row2],
         ephemeral: true
       });
@@ -59,16 +61,21 @@ module.exports = {
           await i.reply({ content: '👁 表示ロールを受け取りました。', ephemeral: true });
         }
 
-        // 両方揃ったら保存して終了
+        // 両方そろったら保存して完了
         if (selected.approverRoles && selected.visibleRoles !== undefined) {
           setApproverRoles(interaction.guildId, selected.approverRoles);
           setVisibleRoles(interaction.guildId, selected.visibleRoles);
 
+          const roleMentions = selected.approverRoles.map(id => `<@&${id}>`).join(', ');
+          const visibleMentions = selected.visibleRoles.length > 0
+            ? selected.visibleRoles.map(id => `<@&${id}>`).join(', ')
+            : '（なし）';
+
           await interaction.editReply({
-            content: `✅ 承認ロール: ${selected.approverRoles.map(r => `<@&${r}>`).join(', ')}\n` +
-                     `👁 表示ロール: ${selected.visibleRoles.length > 0 ? selected.visibleRoles.map(r => `<@&${r}>`).join(', ') : '（なし）'}`,
+            content: `${MESSAGES.ROLE.SET(roleMentions)}\n👁 表示ロール: ${visibleMentions}`,
             components: []
           });
+
           collector.stop();
         }
       });
@@ -76,17 +83,19 @@ module.exports = {
       collector.once('end', collected => {
         if (!selected.approverRoles) {
           interaction.editReply({
-            content: '⏱️ タイムアウトしました。再度コマンドを実行してください。',
+            content: MESSAGES.ROLE.TIMEOUT,
             components: []
           }).catch(console.error);
         }
       });
+
     } catch (err) {
       console.error('❌ ロール設定エラー:', err);
       await interaction.reply({
-        content: '⚠️ ロール設定中にエラーが発生しました。',
+        content: MESSAGES.GENERAL.ERROR,
         ephemeral: true
       });
     }
   }
 };
+

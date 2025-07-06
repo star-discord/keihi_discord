@@ -1,3 +1,5 @@
+// interactions/modals/submit.js
+
 const {
   ActionRowBuilder,
   ButtonBuilder,
@@ -8,8 +10,11 @@ const {
 
 const {
   appendExpenseLog,
-  getApproverRoles
+  getApproverRoles,
+  getExpenseEntries
 } = require('../../utils/fileStorage');
+
+const { getThreadName } = require('../../utils/threadUtils');
 
 module.exports = async function handleModalSubmit(interaction) {
   if (interaction.customId !== 'expense_apply_modal') return;
@@ -31,7 +36,7 @@ module.exports = async function handleModalSubmit(interaction) {
     const userId = interaction.user.id;
     const userName = interaction.user.globalName || interaction.user.username;
     const now = new Date();
-    const yearMonth = now.toISOString().slice(0, 7); // 例: "2025-07"
+    const yearMonth = now.toISOString().slice(0, 7); // "2025-07"
     const approverRoles = getApproverRoles(guildId);
 
     const embed = new EmbedBuilder()
@@ -51,29 +56,36 @@ module.exports = async function handleModalSubmit(interaction) {
       .setLabel('✅ 承認する')
       .setStyle(ButtonStyle.Success);
 
-    const row = new ActionRowBuilder().addComponents(approveButton);
+    const cancelButton = new ButtonBuilder()
+      .setCustomId('cancel_expense')
+      .setLabel('🗑️ 取り消す')
+      .setStyle(ButtonStyle.Secondary);
 
-    // ✅ 「経費申請-YYYY-MM」スレッドがあるか探す
+    const row = new ActionRowBuilder().addComponents(approveButton, cancelButton);
+
+    const allEntries = getExpenseEntries(guildId, yearMonth);
+    const threadBase = `経費申請-${yearMonth}`;
+    const threadName = getThreadName(threadBase, allEntries.length);
+
+    // スレッド再利用 or 作成
     const threads = await interaction.channel.threads.fetchActive();
-    let targetThread = threads.threads.find(thread => thread.name === `経費申請-${yearMonth}`);
+    let targetThread = threads.threads.find(t => t.name === threadName);
 
-    // ✅ なければ新規作成
     if (!targetThread) {
-      const initMessage = await interaction.channel.send({ content: `📂 経費申請スレッドを作成中...` });
-      targetThread = await initMessage.startThread({
-        name: `経費申請-${yearMonth}`,
+      const msg = await interaction.channel.send({ content: `📂 スレッド「${threadName}」を作成中...` });
+      targetThread = await msg.startThread({
+        name: threadName,
         autoArchiveDuration: 1440
       });
     }
 
-    // ✅ 申請メッセージ送信
     const sentMessage = await targetThread.send({
       content: '📝 以下の内容で申請されました：',
       embeds: [embed],
       components: [row]
     });
 
-    // ✅ ログ保存
+    // 保存
     appendExpenseLog(guildId, yearMonth, {
       userId,
       userName,
@@ -98,3 +110,4 @@ module.exports = async function handleModalSubmit(interaction) {
     });
   }
 };
+

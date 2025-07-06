@@ -32,7 +32,7 @@ function loadCommands() {
         console.warn(`⚠️ 無効なコマンド形式: ${file}`);
       }
     } catch (err) {
-      console.error(`❌ コマンド読み込み失敗: ${file}`, err);
+      console.error(`❌ コマンド読み込み失敗 (${file}):`, err);
     }
   }
 }
@@ -42,8 +42,12 @@ async function deployCommands() {
 
   loadCommands();
 
-  const isDevelopment = Boolean(process.env.GUILD_ID);
+  if (commands.length === 0) {
+    console.warn('⚠️ 登録対象のコマンドがありません。');
+    return;
+  }
 
+  const isDevelopment = Boolean(process.env.GUILD_ID);
   const route = isDevelopment
     ? Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID)
     : Routes.applicationCommands(process.env.CLIENT_ID);
@@ -57,5 +61,3 @@ async function deployCommands() {
 }
 
 deployCommands();
-
-

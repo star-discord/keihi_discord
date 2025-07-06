@@ -1,8 +1,9 @@
 const fs = require('fs');
 const path = require('path');
+require('dotenv').config();
 
 // ────────── ベースディレクトリ ──────────
-const BASE_DIR = path.join(__dirname, '..', 'data', 'keihi');
+const BASE_DIR = path.resolve(process.env.BASE_DIR || './data/keihi');
 
 function ensureDirExists(dirPath) {
   if (!fs.existsSync(dirPath)) {
@@ -10,7 +11,7 @@ function ensureDirExists(dirPath) {
   }
 }
 
-// ────────── パス取得 ──────────
+// ────────── パス取得ユーティリティ ──────────
 function getGuildDir(guildId) {
   return path.join(BASE_DIR, guildId);
 }
@@ -23,7 +24,7 @@ function getLogPath(guildId, yearMonth) {
   return path.join(getGuildDir(guildId), 'logs', `${yearMonth}.json`);
 }
 
-// ────────── JSON読み書き ──────────
+// ────────── JSON 読み書き ──────────
 function safeReadJson(filePath, fallback) {
   try {
     if (!fs.existsSync(filePath)) return fallback;
@@ -49,12 +50,18 @@ function saveJson(filePath, data) {
   }
 }
 
-// ────────── ギルド設定 ──────────
+// ────────── 設定データ管理（config.json）──────────
+const configCache = new Map();
+
 function loadGuildData(guildId) {
-  return safeReadJson(getConfigPath(guildId), {});
+  if (configCache.has(guildId)) return configCache.get(guildId);
+  const config = safeReadJson(getConfigPath(guildId), {});
+  configCache.set(guildId, config);
+  return config;
 }
 
 function saveGuildData(guildId, data) {
+  configCache.set(guildId, data);
   saveJson(getConfigPath(guildId), data);
 }
 
@@ -69,12 +76,30 @@ function setApproverRoles(guildId, roles) {
   saveGuildData(guildId, config);
 }
 
-// ────────── 経費ログ ──────────
+// ────────── 経費エントリの構造バリデーション ──────────
+function isValidExpenseEntry(entry) {
+  return (
+    typeof entry.userId === 'string' &&
+    typeof entry.userName === 'string' &&
+    typeof entry.item === 'string' &&
+    typeof entry.amount === 'number' &&
+    typeof entry.detail === 'string' &&
+    typeof entry.timestamp === 'string' &&
+    typeof entry.threadMessageId === 'string' &&
+    Array.isArray(entry.approvedBy)
+  );
+}
+
+// ────────── 経費ログ処理 ──────────
 function appendExpenseLog(guildId, yearMonth, entry) {
-  const path = getLogPath(guildId, yearMonth);
-  const list = safeReadJson(path, []);
+  if (!isValidExpenseEntry(entry)) {
+    console.warn('⚠️ 無効なログエントリが検出されました:', entry);
+    return;
+  }
+  const filePath = getLogPath(guildId, yearMonth);
+  const list = safeReadJson(filePath, []);
   list.push(entry);
-  saveJson(path, list);
+  saveJson(filePath, list);
 }
 
 function getExpenseEntries(guildId, yearMonth, userId = null) {
@@ -146,7 +171,7 @@ module.exports = {
   getApproverRoles,
   setApproverRoles,
 
-  // ログ処理
+  // 経費ログ
   appendExpenseLog,
   getExpenseEntries,
   getUserExpenseEntries,
@@ -155,4 +180,3 @@ module.exports = {
   editExpenseEntry,
   getAvailableExpenseFiles
 };
-

@@ -4,16 +4,17 @@ const { google } = require('googleapis');
 require('dotenv').config();
 
 const SCOPES = ['https://www.googleapis.com/auth/spreadsheets'];
+const BASE_DIR = process.env.BASE_DIR || path.join(__dirname, '..', 'data', 'keihi');
 
-const getSheetAuth = () =>
-  new google.auth.GoogleAuth({
+// ────────── 認証 ──────────
+function getSheetAuth() {
+  return new google.auth.GoogleAuth({
     keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS,
     scopes: SCOPES
   });
+}
 
-// ────────── ファイルパスユーティリティ ──────────
-const BASE_DIR = path.join(__dirname, '..', 'data', 'keihi');
-
+// ────────── パスユーティリティ ──────────
 function getGuildDir(guildId) {
   return path.join(BASE_DIR, guildId);
 }
@@ -28,7 +29,7 @@ function ensureDir(dirPath) {
   }
 }
 
-// ────────── マップの読み書き ──────────
+// ────────── マップ読み書き ──────────
 function readSpreadsheetMap(guildId) {
   const filePath = getSpreadsheetMapPath(guildId);
   try {
@@ -60,11 +61,12 @@ async function createSpreadsheetForGuild(guildId, yearMonth) {
 
   try {
     const res = await sheets.spreadsheets.create({
-      resource: { properties: { title } }
+      resource: {
+        properties: { title }
+      }
     });
 
     const spreadsheetId = res.data.spreadsheetId;
-
     const map = readSpreadsheetMap(guildId);
     map[yearMonth] = spreadsheetId;
     writeSpreadsheetMap(guildId, map);
@@ -92,7 +94,7 @@ async function writeExpensesToSpreadsheet(guildId, yearMonth, entries) {
     spreadsheetId = await createSpreadsheetForGuild(guildId, yearMonth);
   }
 
-  const header = ['日時', '申請者', '項目', '金額', '備考', '承認済ユーザー'];
+  const header = ['日時', '申請者', '項目', '金額', '備考', '承認者'];
   const values = [header];
 
   for (const e of entries) {
@@ -102,10 +104,10 @@ async function writeExpensesToSpreadsheet(guildId, yearMonth, entries) {
       : '';
     values.push([
       date,
-      e.username || e.userId,
-      e.expenseItem || '',
+      e.userName || e.userId,
+      e.item || '',
       e.amount || '',
-      e.notes || '',
+      e.detail || '',
       approvers
     ]);
   }
@@ -126,7 +128,7 @@ async function writeExpensesToSpreadsheet(guildId, yearMonth, entries) {
   }
 }
 
-// ────────── Export ──────────
+// ────────── Exports ──────────
 module.exports = {
   createSpreadsheetForGuild,
   getSpreadsheetIdForGuild,

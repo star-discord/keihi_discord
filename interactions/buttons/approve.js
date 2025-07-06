@@ -36,8 +36,10 @@ module.exports = async function handleApproveButton(interaction) {
 
   // ✅ 表示文作成
   const approverNames = approvedBy.map(a => a.username).join(', ');
-  const max = approverRoles.length || 1; // 0 件のときに分母を 1 に
-  const newContent = `✅ 承認 (${approvedBy.length}/${max})：${approverNames}`;
+  const max = approverRoles.length || 1;
+  const progress = `(${approvedBy.length}/${max})`;
+
+  const newContent = `✅ 承認 ${progress}：${approverNames}`;
 
   try {
     await interaction.update({
@@ -56,5 +58,3 @@ module.exports = async function handleApproveButton(interaction) {
     }
   }
 };
-
-

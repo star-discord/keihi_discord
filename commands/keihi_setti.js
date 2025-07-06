@@ -7,6 +7,7 @@ const {
 } = require('discord.js');
 
 const { getApproverRoles } = require('../utils/fileStorage');
+const MESSAGES = require('../constants/messages');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -16,22 +17,23 @@ module.exports = {
   async execute(interaction) {
     const channel = interaction.channel;
 
-    // ✅ テキストチャンネルでなければ終了
+    // ✅ テキストチャンネルチェック
     if (!channel || channel.type !== ChannelType.GuildText) {
       return interaction.reply({
-        content: 'このコマンドはテキストチャンネルでのみ使用できます。',
+        content: MESSAGES.NOT_TEXT_CHANNEL,
         ephemeral: true
       });
     }
 
-    // ✅ 承認ロール取得（存在しない場合も許容）
-    const approverRoles = getApproverRoles(interaction.guildId) || [];
+    const guildId = interaction.guildId;
+    const approverRoles = getApproverRoles(guildId) || [];
+
     if (approverRoles.length === 0) {
-      console.warn(`[警告] ギルド ${interaction.guildId} に承認ロールが未設定です`);
+      console.warn(`[警告] ギルド ${guildId} に承認ロールが未設定です`);
     }
 
+    // ✅ 過去の案内メッセージ削除（最大50件）
     try {
-      // ✅ 過去の案内メッセージを削除
       const messages = await channel.messages.fetch({ limit: 50 });
 
       for (const msg of messages.values()) {
@@ -44,11 +46,11 @@ module.exports = {
         }
       }
     } catch (err) {
-      console.error('❌ 過去メッセージ削除時のエラー:', err);
+      console.error('❌ 過去案内メッセージ削除エラー:', err);
     }
 
+    // ✅ ボタンとメッセージ送信
     try {
-      // ✅ ボタン作成
       const applyButton = new ButtonBuilder()
         .setCustomId('expense_apply_button')
         .setLabel('経費申請する')
@@ -61,18 +63,17 @@ module.exports = {
 
       const row = new ActionRowBuilder().addComponents(applyButton, approveButton);
 
-      // ✅ 案内メッセージ送信
       await interaction.reply({
-        content: '📋 経費申請をする場合は以下のボタンを押してください。\n承認者には「承認」ボタンが表示されます。',
+        content: MESSAGES.THREAD_HEADER,
         components: [row]
       });
 
-      console.log(`[設置] 経費申請ボタンを送信しました in ${interaction.guildId} / #${channel.name}`);
+      console.log(`[設置完了] 経費申請ボタン in ${guildId} / #${channel.name}`);
 
     } catch (err) {
-      console.error('❌ 経費申請ボタン送信エラー:', err);
+      console.error('❌ 経費申請案内メッセージ送信エラー:', err);
       await interaction.reply({
-        content: '⚠️ 経費申請の案内設置に失敗しました。',
+        content: MESSAGES.ERROR_OCCURRED,
         ephemeral: true
       });
     }

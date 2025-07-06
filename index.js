@@ -10,8 +10,10 @@ const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages],
 });
 
+// コマンド格納用コレクション
 client.commands = new Collection();
 
+// 🔽 コマンド読み込み処理
 const loadCommands = () => {
   const commandsPath = path.join(__dirname, 'commands');
   const files = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
@@ -19,8 +21,10 @@ const loadCommands = () => {
   for (const file of files) {
     const filePath = path.join(commandsPath, file);
     const command = require(filePath);
-    if (command.data?.name && typeof command.execute === 'function') {
-      client.commands.set(command.data.name, command);
+    const commandData = command.default ?? command;
+
+    if (commandData.data?.name && typeof commandData.execute === 'function') {
+      client.commands.set(commandData.data.name, commandData);
       console.log(`✅ コマンド読み込み成功: ${file}`);
     } else {
       console.warn(`⚠️ 無効なコマンド形式: ${file}`);
@@ -28,6 +32,7 @@ const loadCommands = () => {
   }
 };
 
+// 🔽 イベント読み込み処理
 const loadEvents = () => {
   const eventsPath = path.join(__dirname, 'events');
   const files = fs.readdirSync(eventsPath).filter(file => file.endsWith('.js'));
@@ -35,32 +40,36 @@ const loadEvents = () => {
   for (const file of files) {
     const filePath = path.join(eventsPath, file);
     const event = require(filePath);
-    if (!event?.name || typeof event.execute !== 'function') continue;
+    const eventData = event.default ?? event;
 
-    if (event.once) {
-      client.once(event.name, (...args) => event.execute(...args));
+    if (!eventData?.name || typeof eventData.execute !== 'function') continue;
+
+    if (eventData.once) {
+      client.once(eventData.name, (...args) => eventData.execute(...args, client));
     } else {
-      client.on(event.name, (...args) => event.execute(...args));
+      client.on(eventData.name, (...args) => eventData.execute(...args, client));
     }
 
     console.log(`✅ イベント読み込み成功: ${file}`);
   }
 };
 
+// 🔽 起動処理
 (async () => {
   try {
     loadCommands();
     loadEvents();
 
     await client.login(process.env.DISCORD_TOKEN);
-    console.log(`✅ ログイン成功: ${client.user?.tag}`);
+
+    console.log(`✅ ログイン成功: ${client.user.tag}`);
   } catch (err) {
     console.error('❌ 起動エラー:', err);
     process.exit(1);
   }
 })();
 
-// エラーハンドリング
+// 🔽 グローバルなエラーハンドリング
 process.on('unhandledRejection', (reason, promise) => {
   console.error('⚠️ Unhandled Rejection:', reason);
 });
@@ -68,3 +77,4 @@ process.on('unhandledRejection', (reason, promise) => {
 process.on('uncaughtException', err => {
   console.error('⚠️ Uncaught Exception:', err);
 });
+

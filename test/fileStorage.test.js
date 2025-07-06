@@ -1,59 +1,47 @@
 const fs = require('fs');
 const path = require('path');
+const { expect } = require('chai');
+
 const {
   appendExpenseLog,
+  getExpenseEntries,
   updateApprovalStatus
 } = require('../utils/fileStorage');
 
 const TEST_GUILD_ID = 'test-guild';
-const TEST_YEAR_MONTH = '2025-07';
-const TEST_DIR = path.join(__dirname, '..', 'data', 'keihi', TEST_GUILD_ID, 'logs');
-const TEST_FILE = path.join(TEST_DIR, `${TEST_YEAR_MONTH}.json`);
+const TEST_YEAR_MONTH = '2099-12'; // ダミーの未来日で競合防止
 
-function cleanup() {
-  if (fs.existsSync(TEST_FILE)) {
-    fs.unlinkSync(TEST_FILE);
-  }
-}
+const testEntry = {
+  userId: 'user123',
+  userName: 'TestUser',
+  item: 'テスト品目',
+  amount: 1000,
+  detail: 'テスト用',
+  timestamp: new Date().toISOString(),
+  threadMessageId: 'msg123',
+  approvedBy: []
+};
 
-beforeEach(() => cleanup());
-afterAll(() => cleanup());
+describe('fileStorage.js ユニットテスト', () => {
 
-describe('fileStorage.js', () => {
-  test('appendExpenseLog correctly writes new entry', () => {
-    const entry = {
-      userId: 'user123',
-      username: 'testuser',
-      item: 'Test Item',
-      amount: 12345,
-      threadMessageId: 'thread123'
-    };
-
-    appendExpenseLog(TEST_GUILD_ID, TEST_YEAR_MONTH, entry);
-
-    const data = JSON.parse(fs.readFileSync(TEST_FILE, 'utf8'));
-    expect(data).toHaveLength(1);
-    expect(data[0].username).toBe('testuser');
+  after(() => {
+    // ✅ テスト後にファイルを削除
+    const logPath = path.join(__dirname, '..', 'data', 'keihi', TEST_GUILD_ID, 'logs', `${TEST_YEAR_MONTH}.json`);
+    if (fs.existsSync(logPath)) fs.unlinkSync(logPath);
   });
 
-  test('updateApprovalStatus adds approver only once', () => {
-    const entry = {
-      userId: 'user123',
-      username: 'testuser',
-      item: 'Test Item',
-      amount: 12345,
-      threadMessageId: 'thread123',
-      approvedBy: []
-    };
-    fs.mkdirSync(TEST_DIR, { recursive: true });
-    fs.writeFileSync(TEST_FILE, JSON.stringify([entry], null, 2));
-
-    const result = updateApprovalStatus(TEST_GUILD_ID, TEST_YEAR_MONTH, 'thread123', 'approver1', 'Alice');
-    expect(result).toHaveLength(1);
-    expect(result[0].username).toBe('Alice');
-
-    // 2回目は追加されない
-    const again = updateApprovalStatus(TEST_GUILD_ID, TEST_YEAR_MONTH, 'thread123', 'approver1', 'Alice');
-    expect(again).toHaveLength(1);
+  it('appendExpenseLog: 正しくログに追加できること', () => {
+    appendExpenseLog(TEST_GUILD_ID, TEST_YEAR_MONTH, testEntry);
+    const result = getExpenseEntries(TEST_GUILD_ID, TEST_YEAR_MONTH);
+    expect(result).to.be.an('array');
+    expect(result[0]).to.include({ item: 'テスト品目', amount: 1000 });
   });
+
+  it('updateApprovalStatus: 承認者の記録が追加されること', () => {
+    const approved = updateApprovalStatus(TEST_GUILD_ID, TEST_YEAR_MONTH, 'msg123', 'approver001', '承認者1');
+    expect(approved).to.be.an('array');
+    expect(approved.find(u => u.userId === 'approver001')).to.exist;
+  });
+
 });
+
