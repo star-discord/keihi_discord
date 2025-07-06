@@ -1,32 +1,36 @@
-# STAR ChatGPT Discord Bot
+# 経費申請 Discord Bot
 
-Discord上でChatGPTと自然に会話できる **STAR 管理Bot** です。  
-`@bot名` で話しかけると応答し、スラッシュコマンドで動作設定が可能です。
-
-## 🛠 機能概要
-
-- `@bot名` によるメンション応答（OpenAI GPT-4 使用）
-- スラッシュコマンドでトリガー単語の設定が可能
-- `.env` による柔軟な設定
-- `PM2` によるプロセスマネジメント・永続起動対応
-- `update_bot.sh` による自動デプロイスクリプト
-- Discord Slash Command に完全対応
+このリポジトリは、経費申請を Discord 上で行うための Bot プロジェクトです。  
+Google Cloud Storage（GCS）に申請データを保存し、承認フロー付きで運用できます。
 
 ---
 
-## 📦 セットアップ手順
+## 🚀 機能概要
 
-### 1. 必要なもの
+- `/経費申請設置`  
+  モーダル形式で経費申請を入力。スレッドとメッセージを生成します。
 
-- Node.js (v18以上)
-- Discord Bot のトークンと Client ID
-- OpenAI API キー（`https://platform.openai.com/`）
+- 承認ボタン機能  
+  設定されたロールのユーザーのみ「承認」ボタンを押すことができ、押したユーザー名が申請メッセージに追記されます。
 
-### 2. 初期構築
+- `/経費申請設定 承認ロール`  
+  承認できるロールを指定します（複数可）。
 
-```bash
-git clone https://github.com/star-discord/chat_gpt_bot.git
-cd chat_gpt_bot/chat_gpt_bot
+- `/経費申請履歴`（モーダル経由）  
+  指定年月の履歴をスレッドで表示。
 
-npm install
-cp .env.example .env  # 必要に応じて自作
+---
+
+## 🛠 技術スタック
+
+- **Node.js (CommonJS 構成)**
+- Discord.js v14
+- Google Cloud Storage（GCS）
+
+> ✅ このプロジェクトでは `JavaScript (.js)` 形式で全ファイルを記述しています。  
+> TypeScript (.ts) は使用していません。
+
+---
+
+## 📂 ディレクトリ構成（例）
+
