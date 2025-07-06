@@ -1,279 +1,175 @@
-import {
+const {
   Events,
   ModalBuilder,
   TextInputBuilder,
   TextInputStyle,
   ActionRowBuilder,
-  ThreadAutoArchiveDuration,
-  ButtonBuilder,
-  ButtonStyle,
-  EmbedBuilder,
-} from 'discord.js';
+  ThreadAutoArchiveDuration
+} = require('discord.js');
 
-import { Storage } from '@google-cloud/storage';
+const {
+  appendExpenseLog,
+  getExpenseEntries,
+  getApproverRoles
+} = require('../utils/fileStorage');
 
-const bucketName = 'keihi-discord-bot-data-948332309706';
-const fileName = 'keihi/expenses_all.json';
+const {
+  writeExpensesToSpreadsheet
+} = require('../utils/spreadsheet');
 
-const storage = new Storage();
-
-async function appendExpenseData(newEntry) {
-  try {
-    const file = storage.bucket(bucketName).file(fileName);
-    let allData = {};
-
-    const [exists] = await file.exists();
-    if (exists) {
-      const contents = await file.download();
-      allData = JSON.parse(contents[0].toString());
-    }
-
-    const ym = newEntry.timestamp.slice(0, 7);
-    if (!allData[ym]) {
-      allData[ym] = [];
-    }
-
-    allData[ym].push(newEntry);
-
-    await file.save(JSON.stringify(allData, null, 2), {
-      contentType: 'application/json',
-    });
-
-    console.log('✅ 経費データをCloud Storageに追記しました');
-  } catch (error) {
-    console.error('❌ Cloud Storage保存エラー:', error);
-    throw error;
-  }
-}
-
-export default {
+module.exports = {
   name: Events.InteractionCreate,
   async execute(interaction) {
-    const client = interaction.client;
-
+    // コマンド実行
     if (interaction.isChatInputCommand()) {
-      const command = client.commands.get(interaction.commandName);
+      const command = interaction.client.commands.get(interaction.commandName);
       if (!command) return;
       try {
         await command.execute(interaction);
-      } catch (error) {
-        console.error(`コマンド実行エラー [${interaction.user.tag}]:`, error);
+      } catch (err) {
+        console.error(`❌ コマンド実行エラー [${interaction.user.tag}]:`, err);
         if (!interaction.replied && !interaction.deferred) {
-          await interaction.reply({
-            content: 'コマンド実行中にエラーが発生しました。',
-            flags: 64,
-          });
+          await interaction.reply({ content: 'コマンド実行中にエラーが発生しました。', ephemeral: true });
         }
       }
       return;
     }
 
-    if (interaction.isButton()) {
-      if (interaction.customId === 'expense_apply_button') {
-        if (interaction.replied || interaction.deferred) return;
+    // 経費申請ボタン押下 → モーダル表示
+    if (interaction.isButton() && interaction.customId === 'expense_apply_button') {
+      if (interaction.replied || interaction.deferred) return;
 
-        const modal = new ModalBuilder()
-          .setCustomId('expense_apply_modal')
-          .setTitle('経費申請フォーム');
+      const modal = new ModalBuilder()
+        .setCustomId('expense_apply_modal')
+        .setTitle('経費申請フォーム');
 
-        const expenseItemInput = new TextInputBuilder()
-          .setCustomId('expenseItem')
-          .setLabel('経費項目 (例: 交通費、資料代)')
-          .setStyle(TextInputStyle.Short)
-          .setRequired(true);
+      modal.addComponents(
+        new ActionRowBuilder().addComponents(
+          new TextInputBuilder()
+            .setCustomId('expenseItem')
+            .setLabel('経費項目')
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true)),
+        new ActionRowBuilder().addComponents(
+          new TextInputBuilder()
+            .setCustomId('amount')
+            .setLabel('金額')
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true)),
+        new ActionRowBuilder().addComponents(
+          new TextInputBuilder()
+            .setCustomId('notes')
+            .setLabel('備考（任意）')
+            .setStyle(TextInputStyle.Paragraph)
+            .setRequired(false))
+      );
 
-        const amountInput = new TextInputBuilder()
-          .setCustomId('amount')
-          .setLabel('金額 (例: 1000)')
-          .setStyle(TextInputStyle.Short)
-          .setRequired(true);
+      return await interaction.showModal(modal);
+    }
 
-        const notesInput = new TextInputBuilder()
-          .setCustomId('notes')
-          .setLabel('備考（任意）')
-          .setStyle(TextInputStyle.Paragraph)
-          .setRequired(false);
+    // 経費申請モーダル送信後
+    if (interaction.isModalSubmit() && interaction.customId === 'expense_apply_modal') {
+      if (interaction.replied || interaction.deferred) return;
 
-        modal.addComponents(
-          new ActionRowBuilder().addComponents(expenseItemInput),
-          new ActionRowBuilder().addComponents(amountInput),
-          new ActionRowBuilder().addComponents(notesInput),
-        );
+      await interaction.deferReply({ ephemeral: true });
 
-        try {
-          await interaction.showModal(modal);
-        } catch (error) {
-          console.error(`モーダル表示エラー [${interaction.user.tag}]:`, error);
-          if (!interaction.replied && !interaction.deferred) {
-            await interaction.reply({ content: 'モーダルの表示に失敗しました。', flags: 64 });
-          }
-        }
-        return;
+      const expenseItem = interaction.fields.getTextInputValue('expenseItem');
+      const amount = interaction.fields.getTextInputValue('amount');
+      const notes = interaction.fields.getTextInputValue('notes') || '（備考なし）';
+      const channel = interaction.channel;
+      const guildId = interaction.guildId;
+
+      const now = new Date();
+      const yearMonth = now.toISOString().slice(0, 7);
+      const formattedDate = now.toLocaleString('ja-JP', {
+        timeZone: 'Asia/Tokyo',
+        year: 'numeric', month: 'numeric', day: 'numeric',
+        hour: '2-digit', minute: '2-digit', second: '2-digit'
+      }).replace(/\//g, '-');
+
+      let thread = (await channel.threads.fetch()).threads.find(t => t.name === `経費申請-${yearMonth}`);
+      if (!thread) {
+        thread = await channel.threads.create({
+          name: `経費申請-${yearMonth}`,
+          autoArchiveDuration: ThreadAutoArchiveDuration.OneDay,
+          reason: `経費申請スレッド作成 by ${interaction.user.tag}`
+        });
       }
+
+      const entry = {
+        userId: interaction.user.id,
+        username: interaction.user.username,
+        expenseItem,
+        amount: Number(amount),
+        notes,
+        timestamp: now.toISOString(),
+        approvedBy: [],
+        threadMessageId: null
+      };
+
+      const threadMessage = await thread.send(
+        `**経費申請**\n- 名前: <@${interaction.user.id}>\n- 経費項目: ${expenseItem}\n- 金額: ${amount} 円\n- 備考: ${notes}`
+      );
+
+      entry.threadMessageId = threadMessage.id;
+      await appendExpenseLog(guildId, yearMonth, entry);
+
+      await interaction.channel.send(
+        `経費申請しました。　${formattedDate}　${interaction.member?.displayName || interaction.user.username} (<@${interaction.user.id}>)　${threadMessage.url}`
+      );
+
+      await interaction.editReply('経費申請を受け付けました。ありがとうございます。');
       return;
     }
 
-    if (interaction.isModalSubmit()) {
-      if (interaction.customId === 'expense_apply_modal') {
-        if (interaction.replied || interaction.deferred) return;
+    // 履歴確認モーダル（旧：expenseHistoryModal）は不要
 
-        const expenseItem = interaction.fields.getTextInputValue('expenseItem');
-        const amount = interaction.fields.getTextInputValue('amount');
-        const notes = interaction.fields.getTextInputValue('notes') || '（備考なし）';
+    // ✅ 選択メニューから履歴表示
+    if (interaction.isStringSelectMenu() && interaction.customId === 'select_expense_history') {
+      if (interaction.replied || interaction.deferred) return;
 
-        const channel = interaction.channel;
-        if (!channel) {
-          await interaction.reply({ content: 'この操作はテキストチャンネルでのみ可能です。', ephemeral: true });
-          return;
-        }
+      await interaction.deferReply({ ephemeral: true });
 
-        try {
-          await interaction.deferReply({ ephemeral: true });
+      const yearMonth = interaction.values[0];
+      const userId = interaction.user.id;
+      const guildId = interaction.guildId;
 
-          const now = new Date();
-          const yearMonth = now.toISOString().slice(0, 7);
-          const formattedDate = now.toLocaleString('ja-JP', {
-            timeZone: 'Asia/Tokyo',
-            year: 'numeric',
-            month: 'numeric',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-          }).replace(/\//g, '-');
-
-          const threadName = `経費申請-${yearMonth}`;
-          let thread = (await channel.threads.fetch()).threads.find(t => t.name === threadName);
-
-          if (!thread) {
-            thread = await channel.threads.create({
-              name: threadName,
-              autoArchiveDuration: ThreadAutoArchiveDuration.OneDay,
-              reason: `経費申請スレッド作成 by ${interaction.user.tag}`,
-            });
-          }
-
-          try {
-            await appendExpenseData({
-              userId: interaction.user.id,
-              username: interaction.user.username,
-              expenseItem,
-              amount: Number(amount),
-              notes,
-              timestamp: now.toISOString(),
-            });
-          } catch (e) {
-            console.error('Cloud Storage保存失敗:', e);
-          }
-
-          const threadMessage = await thread.send(
-            `**経費申請**\n- 名前: <@${interaction.user.id}>\n- 経費項目: ${expenseItem}\n- 金額: ${amount} 円\n- 備考: ${notes}`
-          );
-
-          await channel.send(
-            `経費申請しました。　${formattedDate}　${interaction.member?.displayName || interaction.user.username} (<@${interaction.user.id}>)　${threadMessage.url}`
-          );
-
-          try {
-            const fetchedMessages = await channel.messages.fetch({ limit: 50 });
-            for (const msg of fetchedMessages.values()) {
-              if (
-                msg.author.id === interaction.client.user.id &&
-                msg.content.includes('経費申請をする場合は以下のボタンを押してください。')
-              ) {
-                try {
-                  await msg.delete();
-                } catch (e) {
-                  console.error('既存案内メッセージ削除失敗:', e);
-                }
-              }
-            }
-          } catch (err) {
-            console.error('案内メッセージ取得失敗:', err);
-          }
-
-          const row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-              .setCustomId('expense_apply_button')
-              .setLabel('経費申請をする場合は以下のボタンを押してください。')
-              .setStyle(ButtonStyle.Primary)
-          );
-
-          await channel.send({
-            content: '経費申請をする場合は以下のボタンを押してください。',
-            components: [row],
-          });
-
-          await interaction.editReply('経費申請を受け付けました。ありがとうございます。');
-
-        } catch (e) {
-          console.error(`[${interaction.user.tag}] モーダル送信処理エラー:`, e);
-          if (!interaction.replied && !interaction.deferred) {
-            await interaction.reply({ content: '申請内容の送信に失敗しました。', ephemeral: true });
-          }
-        }
-        return;
+      const entries = getExpenseEntries(guildId, yearMonth, userId);
+      if (entries.length === 0) {
+        return await interaction.editReply('申請履歴が見つかりませんでした。');
       }
 
-      if (interaction.customId === 'expenseHistoryModal') {
-        if (interaction.replied || interaction.deferred) return;
+      const approverRoles = getApproverRoles(guildId);
+      const memberList = await interaction.guild.members.fetch();
+      const approverIds = memberList.filter(m =>
+        approverRoles.some(r => m.roles.cache.has(r))
+      ).map(m => m.user.id);
 
-        const yearMonth = interaction.fields.getTextInputValue('yearMonth')?.trim();
-        const userId = interaction.user.id;
+      const lines = entries.map(entry => {
+        const date = new Date(entry.timestamp).toLocaleDateString('ja-JP');
+        const approved = (entry.approvedBy || []).filter(a => approverIds.includes(a.userId)).length;
+        const total = approverIds.length;
+        return `📅 ${date}｜📌 ${entry.expenseItem}｜💴 ${entry.amount}円｜✅ 承認状況: ${approved}/${total}`;
+      });
 
-        try {
-          await interaction.deferReply({ ephemeral: true });
+      const thread = await interaction.channel.threads.create({
+        name: `申請履歴-${interaction.user.username}`,
+        autoArchiveDuration: ThreadAutoArchiveDuration.OneHour,
+        reason: '経費申請履歴確認'
+      });
 
-          const file = storage.bucket(bucketName).file(fileName);
-          const [exists] = await file.exists();
-          if (!exists) {
-            await interaction.editReply('履歴ファイルが存在しません。');
-            return;
-          }
+      await thread.send(`<@${userId}> さんの履歴：\n${lines.join('\n')}`);
 
-          const contents = await file.download();
-          const allData = JSON.parse(contents[0].toString());
-
-          const entries = [];
-          for (const ym in allData) {
-            if (yearMonth && ym !== yearMonth) continue;
-            for (const entry of allData[ym]) {
-              if (entry.userId === userId) entries.push(entry);
-            }
-          }
-
-          if (entries.length === 0) {
-            await interaction.editReply('申請履歴が見つかりませんでした。');
-            return;
-          }
-
-          const lines = entries.map(entry => {
-            const date = new Date(entry.timestamp).toLocaleDateString('ja-JP');
-            return `📅 ${date}｜📌 ${entry.expenseItem}`;
-          });
-
-          const header = yearMonth ? `📄 ${yearMonth} の履歴` : `📄 申請履歴`;
-          const message = `${header}（${entries.length}件）\n${lines.join('\n')}`;
-
-          const thread = await interaction.channel.threads.create({
-            name: `申請履歴-${interaction.user.username}`,
-            autoArchiveDuration: ThreadAutoArchiveDuration.OneHour,
-            reason: '経費申請履歴確認',
-          });
-
-          await thread.send(`<@${userId}> さんの履歴：\n${message}`);
-
-          await interaction.editReply(`✅ 履歴を以下のスレッドに表示しました：\n${thread.url}`);
-
-        } catch (err) {
-          console.error('履歴取得エラー:', err);
-          await interaction.editReply('履歴の取得中にエラーが発生しました。');
-        }
-
-        return;
+      try {
+        const spreadsheetId = await writeExpensesToSpreadsheet(guildId, yearMonth, entries);
+        const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`;
+        await thread.send(`📄 スプレッドシート出力:\n${url}`);
+      } catch (err) {
+        console.error('スプレッドシート出力エラー:', err);
+        await thread.send('⚠️ スプレッドシート出力に失敗しました。');
       }
+
+      await interaction.editReply(`✅ 履歴を以下のスレッドに表示しました：\n${thread.url}`);
     }
-  },
+  }
 };
-
-
