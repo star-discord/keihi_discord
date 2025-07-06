@@ -1,34 +1,60 @@
 // deploy-commands.js
-require('dotenv').config();
-const fs = require('fs');
-const path = require('path');
-const { REST, Routes } = require('discord.js');
+import { REST, Routes } from 'discord.js';
+import { config } from 'dotenv';
+import fs from 'fs/promises';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
+config();
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const commands = [];
-const commandsPath = path.join(__dirname, 'commands');
-const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
 
-for (const file of commandFiles) {
-  const filePath = path.join(commandsPath, file);
-  const command = require(filePath);
-  if ('data' in command && 'execute' in command) {
-    commands.push(command.data.toJSON());
-  } else {
-    console.warn(`[WARNING] スラッシュコマンド形式不正: ${filePath}`);
+async function loadCommands() {
+  const commandsPath = path.join(__dirname, 'commands');
+  let commandFiles;
+
+  try {
+    commandFiles = (await fs.readdir(commandsPath)).filter(file => file.endsWith('.js'));
+  } catch (err) {
+    console.error('❌ コマンドディレクトリ読み込みエラー:', err);
+    return;
+  }
+
+  for (const file of commandFiles) {
+    const filePath = path.join(commandsPath, file);
+    try {
+      const commandModule = await import(`file://${filePath}`);
+      const command = commandModule.default ?? commandModule;
+      if (command?.data?.toJSON) {
+        commands.push(command.data.toJSON());
+        console.log(`✅ コマンド読み込み成功: ${file}`);
+      } else {
+        console.warn(`⚠️ 無効なコマンド形式: ${file}`);
+      }
+    } catch (err) {
+      console.error(`❌ コマンド読み込み失敗: ${file}`, err);
+    }
   }
 }
 
-const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
+async function deployCommands() {
+  const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
+  await loadCommands();
 
-(async () => {
+  const isDevelopment = Boolean(process.env.GUILD_ID);
+
+  const route = isDevelopment
+    ? Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID)
+    : Routes.applicationCommands(process.env.CLIENT_ID);
+
   try {
-    console.log(`⏳ ${commands.length}個のスラッシュコマンドを登録中...`);
-    await rest.put(
-      Routes.applicationCommands(process.env.CLIENT_ID),
-      { body: commands },
-    );
-    console.log('✅ 登録完了。');
-  } catch (error) {
-    console.error('❌ コマンド登録失敗:', error);
+    const result = await rest.put(route, { body: commands });
+    console.log(`📤 ${isDevelopment ? '開発ギルド' : '全体'}に ${commands.length} 件のコマンドを登録しました`);
+  } catch (err) {
+    console.error('❌ コマンド登録失敗:', err);
   }
-})();
+}
+
+deployCommands();
+

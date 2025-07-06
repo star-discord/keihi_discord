@@ -1,5 +1,4 @@
-// ✅ index.js（不要な HTTP サーバー処理削除済み）
-
+// index.js
 const { Client, Collection, GatewayIntentBits } = require('discord.js');
 const dotenv = require('dotenv');
 const fs = require('fs');
@@ -13,49 +12,59 @@ const client = new Client({
 
 client.commands = new Collection();
 
+const loadCommands = () => {
+  const commandsPath = path.join(__dirname, 'commands');
+  const files = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
+
+  for (const file of files) {
+    const filePath = path.join(commandsPath, file);
+    const command = require(filePath);
+    if (command.data?.name && typeof command.execute === 'function') {
+      client.commands.set(command.data.name, command);
+      console.log(`✅ コマンド読み込み成功: ${file}`);
+    } else {
+      console.warn(`⚠️ 無効なコマンド形式: ${file}`);
+    }
+  }
+};
+
+const loadEvents = () => {
+  const eventsPath = path.join(__dirname, 'events');
+  const files = fs.readdirSync(eventsPath).filter(file => file.endsWith('.js'));
+
+  for (const file of files) {
+    const filePath = path.join(eventsPath, file);
+    const event = require(filePath);
+    if (!event?.name || typeof event.execute !== 'function') continue;
+
+    if (event.once) {
+      client.once(event.name, (...args) => event.execute(...args));
+    } else {
+      client.on(event.name, (...args) => event.execute(...args));
+    }
+
+    console.log(`✅ イベント読み込み成功: ${file}`);
+  }
+};
+
 (async () => {
   try {
-    const commandsPath = path.join(__dirname, 'commands');
-    const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
-
-    for (const file of commandFiles) {
-      const command = require(path.join(commandsPath, file));
-      if (command.data && command.execute) {
-        client.commands.set(command.data.name, command);
-        console.log(`✅ コマンド読み込み成功: ${file}`);
-      } else {
-        console.warn(`⚠️ コマンド形式不正: ${file}`);
-      }
-    }
-
-    const eventsPath = path.join(__dirname, 'events');
-    const eventFiles = fs.readdirSync(eventsPath).filter(file => file.endsWith('.js'));
-
-    for (const file of eventFiles) {
-      const event = require(path.join(eventsPath, file));
-      if (!event || !event.name || !event.execute) continue;
-
-      if (event.once) {
-        client.once(event.name, (...args) => event.execute(...args));
-      } else {
-        client.on(event.name, (...args) => event.execute(...args));
-      }
-
-      console.log(`✅ イベント読み込み成功: ${file}`);
-    }
+    loadCommands();
+    loadEvents();
 
     await client.login(process.env.DISCORD_TOKEN);
-    console.log('✅ Discord client logged in successfully.');
+    console.log(`✅ ログイン成功: ${client.user?.tag}`);
   } catch (err) {
-    console.error('❌ 初期ロードエラー:', err);
+    console.error('❌ 起動エラー:', err);
     process.exit(1);
   }
 })();
 
+// エラーハンドリング
 process.on('unhandledRejection', (reason, promise) => {
-  console.error('⚠️ Unhandled Rejection at:', promise, 'reason:', reason);
+  console.error('⚠️ Unhandled Rejection:', reason);
 });
 
-process.on('uncaughtException', error => {
-  console.error('⚠️ Uncaught Exception thrown:', error);
+process.on('uncaughtException', err => {
+  console.error('⚠️ Uncaught Exception:', err);
 });

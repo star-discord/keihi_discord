@@ -1,4 +1,8 @@
-const { getApproverRoles, updateApprovalStatus, getExpenseEntries } = require('../utils/fileStorage');
+const {
+  getApproverRoles,
+  updateApprovalStatus,
+  getExpenseEntries
+} = require('../utils/fileStorage');
 
 module.exports = {
   data: {
@@ -10,44 +14,67 @@ module.exports = {
     const member = interaction.member;
     const approverRoles = getApproverRoles(guildId);
 
-    if (!approverRoles.some(roleId => member.roles.cache.has(roleId))) {
+    // ✅ 権限チェック
+    const hasPermission = approverRoles.some(roleId =>
+      member.roles.cache.has(roleId)
+    );
+
+    if (!hasPermission) {
       return await interaction.reply({
-        content: 'あなたには承認権限がありません。',
+        content: '❌ あなたには承認権限がありません。',
         ephemeral: true
       });
     }
 
-    const message = interaction.message;
-    const threadMessageId = message.id;
-    const nameTag = member.displayName || interaction.user.username;
+    const targetMessage = interaction.message;
+    const threadMessageId = targetMessage.id;
+    const approverName = member.displayName || interaction.user.username;
 
     const now = new Date();
     const yearMonth = now.toISOString().slice(0, 7);
 
-    // ✅ 承認更新
-    updateApprovalStatus(guildId, yearMonth, threadMessageId, interaction.user.id, nameTag);
+    // ✅ 承認ステータスを更新
+    updateApprovalStatus(
+      guildId,
+      yearMonth,
+      threadMessageId,
+      interaction.user.id,
+      approverName
+    );
 
-    // ✅ 最新の承認リストを取得（再取得）
+    // ✅ 最新のエントリ情報を取得
     const allEntries = getExpenseEntries(guildId, yearMonth);
     const entry = allEntries.find(e => e.threadMessageId === threadMessageId);
-    const approvedList = entry?.approvedBy || [];
 
-    // ✅ メッセージ更新内容
-    let newContent = message.content;
-    const usernames = [...new Set(approvedList.map(u => u.username))];
+    if (!entry) {
+      return await interaction.reply({
+        content: '⚠️ 承認対象のデータが見つかりませんでした。',
+        ephemeral: true
+      });
+    }
 
-    if (!newContent.includes('✅ 承認済')) {
-      newContent += `\n✅ 承認済（1名）: ${nameTag}`;
+    const approvedList = entry.approvedBy || [];
+    const uniqueNames = [...new Set(approvedList.map(u => u.username))];
+
+    // ✅ メッセージ本文を編集
+    let newContent = targetMessage.content;
+
+    const approvedLine = `✅ 承認済（${uniqueNames.length}名）: ${uniqueNames.join(', ')}`;
+    if (newContent.includes('✅ 承認済')) {
+      newContent = newContent.replace(/✅ 承認済.+/, approvedLine);
     } else {
-      newContent = newContent.replace(/✅ 承認済.+/, `✅ 承認済（${usernames.length}名）: ${usernames.join(', ')}`);
+      newContent += `\n${approvedLine}`;
     }
 
     try {
-      await message.edit({ content: newContent });
-      await interaction.reply({ content: '承認しました。', ephemeral: true });
+      await targetMessage.edit({ content: newContent });
+      await interaction.reply({ content: '✅ 承認しました。', ephemeral: true });
     } catch (err) {
-      console.error('✅ メッセージ編集失敗:', err);
-      await interaction.reply({ content: '承認処理中にエラーが発生しました。', ephemeral: true });
+      console.error('❌ メッセージ編集失敗:', err);
+      await interaction.reply({
+        content: '⚠️ 承認処理中にエラーが発生しました。',
+        ephemeral: true
+      });
     }
   }
 };

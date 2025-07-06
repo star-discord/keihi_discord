@@ -1,7 +1,8 @@
 const { SlashCommandBuilder } = require('discord.js');
 
+// 📄 Bot の機能概要・仕様説明
 const specText = `
->>> **📄 経費申請Bot 仕様書**
+>>> 📄 **経費申請Bot 仕様書**
 
 ---
 
@@ -14,7 +15,7 @@ const specText = `
 ### ✅ 主な機能
 
 - \`/経費申請設置\` コマンドで案内メッセージとボタンを送信
-- 「経費申請する」ボタンでモーダルフォーム表示
+- 「経費申請する」ボタンでモーダルフォームを表示
 - 「経費項目・金額・備考」を入力して送信
 - 月別スレッド「経費申請-YYYY-MM」に投稿
 - テキストチャンネルに申請通知（日時・名前・メンション・スレッドリンク）
@@ -48,10 +49,10 @@ module.exports = {
       console.error('仕様書表示エラー:', error);
       if (!interaction.replied) {
         await interaction.reply({
-          content: 'エラーが発生しました。',
-          ephemeral: true,
+          content: '⚠️ エラーが発生しました。もう一度お試しください。',
+          ephemeral: true
         });
       }
     }
-  },
+  }
 };

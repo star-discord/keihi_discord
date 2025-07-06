@@ -1,5 +1,3 @@
-// ✅ utils/fileStorage.js（ローカル保存＋承認対応・ユーザー名対応）
-
 const fs = require('fs');
 const path = require('path');
 
@@ -17,6 +15,17 @@ function getExpenseLogPath(guildId, yearMonth) {
   return path.join(getGuildDir(guildId), `${yearMonth}.json`);
 }
 
+// ✅ 共通JSON読み込み関数（失敗時は fallback を返す）
+function readJson(filePath, fallback = []) {
+  try {
+    if (!fs.existsSync(filePath)) return fallback;
+    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  } catch (err) {
+    console.error(`❌ JSON読み込み失敗 (${filePath}):`, err);
+    return fallback;
+  }
+}
+
 function loadGuildData(guildId) {
   const filePath = getGuildFilePath(guildId);
   try {
@@ -27,7 +36,7 @@ function loadGuildData(guildId) {
       fs.writeFileSync(filePath, JSON.stringify({}, null, 2));
       return {};
     }
-    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    return readJson(filePath, {});
   } catch (err) {
     console.error(`❌ ギルド設定読み込みエラー (${guildId}):`, err);
     return {};
@@ -56,13 +65,9 @@ function setApproverRoles(guildId, roles) {
 
 function appendExpenseLog(guildId, yearMonth, newEntry) {
   const logPath = getExpenseLogPath(guildId, yearMonth);
-  let data = [];
-
+  const data = readJson(logPath, []);
+  data.push(newEntry);
   try {
-    if (fs.existsSync(logPath)) {
-      data = JSON.parse(fs.readFileSync(logPath, 'utf8'));
-    }
-    data.push(newEntry);
     fs.writeFileSync(logPath, JSON.stringify(data, null, 2));
   } catch (err) {
     console.error(`❌ 経費ログ保存エラー (${guildId}/${yearMonth}):`, err);
@@ -71,43 +76,35 @@ function appendExpenseLog(guildId, yearMonth, newEntry) {
 
 function getExpenseEntries(guildId, yearMonth, userId = null) {
   const logPath = getExpenseLogPath(guildId, yearMonth);
-  try {
-    if (!fs.existsSync(logPath)) return [];
-    const entries = JSON.parse(fs.readFileSync(logPath, 'utf8'));
-    return userId ? entries.filter(e => e.userId === userId) : entries;
-  } catch (err) {
-    console.error(`❌ 経費ログ読み込みエラー (${guildId}/${yearMonth}):`, err);
-    return [];
-  }
+  const entries = readJson(logPath, []);
+  return userId ? entries.filter(e => e.userId === userId) : entries;
 }
 
 function updateApprovalStatus(guildId, yearMonth, threadMessageId, userId, username) {
   const logPath = getExpenseLogPath(guildId, yearMonth);
-  try {
-    if (!fs.existsSync(logPath)) return;
-    const data = JSON.parse(fs.readFileSync(logPath, 'utf8'));
-    const target = data.find(e => e.threadMessageId === threadMessageId);
-    if (!target) return;
-    if (!target.approvedBy) target.approvedBy = [];
+  const data = readJson(logPath, []);
+  const target = data.find(e => e.threadMessageId === threadMessageId);
+  if (!target) return [];
 
-    const alreadyApproved = target.approvedBy.find(a => a.userId === userId);
-    if (!alreadyApproved) {
-      target.approvedBy.push({ userId, username });
+  if (!target.approvedBy) target.approvedBy = [];
+
+  const alreadyApproved = target.approvedBy.find(a => a.userId === userId);
+  if (!alreadyApproved) {
+    target.approvedBy.push({ userId, username });
+    try {
       fs.writeFileSync(logPath, JSON.stringify(data, null, 2));
+    } catch (err) {
+      console.error(`❌ 承認保存エラー (${guildId}/${yearMonth}):`, err);
     }
-
-    return target.approvedBy;
-  } catch (err) {
-    console.error(`❌ 承認更新エラー (${guildId}/${yearMonth}):`, err);
-    return [];
   }
+
+  return target.approvedBy;
 }
 
 function getAvailableExpenseFiles(guildId) {
   const dirPath = getGuildDir(guildId);
   try {
     if (!fs.existsSync(dirPath)) return [];
-
     return fs.readdirSync(dirPath)
       .filter(name => /^\d{4}-\d{2}\.json$/.test(name))
       .map(name => name.replace('.json', ''));

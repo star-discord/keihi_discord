@@ -1,5 +1,3 @@
-// utils/spreadsheet.js
-
 const fs = require('fs');
 const path = require('path');
 const { google } = require('googleapis');
@@ -7,54 +5,73 @@ require('dotenv').config();
 
 const SCOPES = ['https://www.googleapis.com/auth/spreadsheets'];
 
-async function createSpreadsheetForGuild(guildId, yearMonth) {
-  const auth = new google.auth.GoogleAuth({
-    keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS,
-    scopes: SCOPES
-  });
+const getSheetAuth = () => new google.auth.GoogleAuth({
+  keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS,
+  scopes: SCOPES
+});
 
-  const sheets = google.sheets({ version: 'v4', auth });
-  const title = `経費申請ログ_${guildId}_${yearMonth}`;
+function getSpreadsheetMapPath(guildId) {
+  return path.join('data', guildId, 'spreadsheet_map.json');
+}
 
-  const res = await sheets.spreadsheets.create({
-    resource: {
-      properties: { title }
-    }
-  });
-
-  const spreadsheetId = res.data.spreadsheetId;
-
-  const dir = path.join('data', guildId);
-  const mapPath = path.join(dir, 'spreadsheet_map.json');
-
+function ensureDir(dir) {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
+}
 
-  let existing = {};
-  if (fs.existsSync(mapPath)) {
-    existing = JSON.parse(fs.readFileSync(mapPath, 'utf8'));
+function readSpreadsheetMap(guildId) {
+  const mapPath = getSpreadsheetMapPath(guildId);
+  if (!fs.existsSync(mapPath)) return {};
+  try {
+    return JSON.parse(fs.readFileSync(mapPath, 'utf8'));
+  } catch (err) {
+    console.error(`❌ マップファイル読込失敗 (${mapPath}):`, err);
+    return {};
   }
+}
 
-  existing[yearMonth] = spreadsheetId;
-  fs.writeFileSync(mapPath, JSON.stringify(existing, null, 2));
+function writeSpreadsheetMap(guildId, map) {
+  const mapPath = getSpreadsheetMapPath(guildId);
+  try {
+    ensureDir(path.dirname(mapPath));
+    fs.writeFileSync(mapPath, JSON.stringify(map, null, 2));
+  } catch (err) {
+    console.error(`❌ マップファイル保存失敗 (${mapPath}):`, err);
+  }
+}
 
-  console.log(`✅ スプレッドシート作成成功: ${title}`);
-  return spreadsheetId;
+async function createSpreadsheetForGuild(guildId, yearMonth) {
+  const auth = getSheetAuth();
+  const sheets = google.sheets({ version: 'v4', auth });
+  const title = `経費申請ログ_${guildId}_${yearMonth}`;
+
+  try {
+    const res = await sheets.spreadsheets.create({
+      resource: { properties: { title } }
+    });
+
+    const spreadsheetId = res.data.spreadsheetId;
+
+    const map = readSpreadsheetMap(guildId);
+    map[yearMonth] = spreadsheetId;
+    writeSpreadsheetMap(guildId, map);
+
+    console.log(`✅ スプレッドシート作成成功: ${title}`);
+    return spreadsheetId;
+  } catch (err) {
+    console.error(`❌ スプレッドシート作成失敗:`, err);
+    throw err;
+  }
 }
 
 function getSpreadsheetIdForGuild(guildId, yearMonth) {
-  const mapPath = path.join('data', guildId, 'spreadsheet_map.json');
-  if (!fs.existsSync(mapPath)) return null;
-  const data = JSON.parse(fs.readFileSync(mapPath, 'utf8'));
-  return data[yearMonth] || null;
+  const map = readSpreadsheetMap(guildId);
+  return map[yearMonth] || null;
 }
 
 async function writeExpensesToSpreadsheet(guildId, yearMonth, entries) {
-  const auth = new google.auth.GoogleAuth({
-    keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS,
-    scopes: SCOPES
-  });
+  const auth = getSheetAuth();
   const sheets = google.sheets({ version: 'v4', auth });
 
   let spreadsheetId = getSpreadsheetIdForGuild(guildId, yearMonth);
@@ -80,17 +97,20 @@ async function writeExpensesToSpreadsheet(guildId, yearMonth, entries) {
     ]);
   }
 
-  await sheets.spreadsheets.values.update({
-    spreadsheetId,
-    range: 'A1',
-    valueInputOption: 'RAW',
-    resource: {
-      values
-    }
-  });
+  try {
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: 'A1',
+      valueInputOption: 'RAW',
+      resource: { values }
+    });
 
-  console.log(`✅ スプレッドシートへ書き込み完了: ${spreadsheetId}`);
-  return spreadsheetId;
+    console.log(`✅ スプレッドシートへ書き込み完了: ${spreadsheetId}`);
+    return spreadsheetId;
+  } catch (err) {
+    console.error(`❌ スプレッドシート書き込み失敗:`, err);
+    throw err;
+  }
 }
 
 module.exports = {

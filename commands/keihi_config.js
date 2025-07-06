@@ -1,5 +1,3 @@
-// ✅ commands/keihi_config.js（承認ロール設定コマンド + 承認ボタン設置）
-
 const {
   SlashCommandBuilder,
   PermissionFlagsBits,
@@ -28,58 +26,79 @@ module.exports = {
     const sub = interaction.options.getSubcommand();
 
     if (sub === '承認ロール') {
-      const menu = new RoleSelectMenuBuilder()
-        .setCustomId('select_approver_roles')
-        .setPlaceholder('承認ロールを選択...')
-        .setMinValues(1)
-        .setMaxValues(5);
+      try {
+        const menu = new RoleSelectMenuBuilder()
+          .setCustomId('select_approver_roles')
+          .setPlaceholder('承認ロールを選択...')
+          .setMinValues(1)
+          .setMaxValues(5);
 
-      const row = new ActionRowBuilder().addComponents(menu);
-      await interaction.reply({
-        content: '承認ロールを選択してください（複数選択可）',
-        components: [row],
-        ephemeral: true
-      });
+        const row = new ActionRowBuilder().addComponents(menu);
 
-      const collector = interaction.channel.createMessageComponentCollector({
-        componentType: ComponentType.RoleSelect,
-        time: 60_000,
-        filter: i => i.customId === 'select_approver_roles' && i.user.id === interaction.user.id,
-      });
-
-      collector.once('collect', async i => {
-        const selectedRoleIds = i.values;
-        setApproverRoles(interaction.guildId, selectedRoleIds);
-        await i.update({
-          content: `✅ 承認ロールを設定しました：${selectedRoleIds.map(id => `<@&${id}>`).join(', ')}`,
-          components: []
+        await interaction.reply({
+          content: '✅ 承認ロールを選択してください（複数選択可）',
+          components: [row],
+          ephemeral: true
         });
-      });
 
-      collector.once('end', collected => {
-        if (collected.size === 0) {
-          interaction.editReply({ content: 'タイムアウトしました。もう一度実行してください。', components: [] });
-        }
-      });
+        const collector = interaction.channel.createMessageComponentCollector({
+          componentType: ComponentType.RoleSelect,
+          time: 60_000,
+          filter: i => i.customId === 'select_approver_roles' && i.user.id === interaction.user.id,
+        });
+
+        collector.once('collect', async i => {
+          const selectedRoleIds = i.values;
+          await setApproverRoles(interaction.guildId, selectedRoleIds);
+          await i.update({
+            content: `✅ 承認ロールを設定しました：${selectedRoleIds.map(id => `<@&${id}>`).join(', ')}`,
+            components: []
+          });
+        });
+
+        collector.once('end', collected => {
+          if (collected.size === 0) {
+            interaction.editReply({
+              content: '⏱️ タイムアウトしました。もう一度コマンドを実行してください。',
+              components: []
+            }).catch(console.error);
+          }
+        });
+      } catch (err) {
+        console.error('❌ 承認ロール設定エラー:', err);
+        await interaction.reply({
+          content: 'エラーが発生しました。もう一度お試しください。',
+          ephemeral: true
+        });
+      }
     }
 
     if (sub === '設置') {
-      const applyButton = new ButtonBuilder()
-        .setCustomId('expense_apply_button')
-        .setLabel('経費申請をする')
-        .setStyle(ButtonStyle.Primary);
+      try {
+        const applyButton = new ButtonBuilder()
+          .setCustomId('expense_apply_button')
+          .setLabel('経費申請をする')
+          .setStyle(ButtonStyle.Primary);
 
-      const approveButton = new ButtonBuilder()
-        .setCustomId('approve_button')
-        .setLabel('承認する')
-        .setStyle(ButtonStyle.Success);
+        const approveButton = new ButtonBuilder()
+          .setCustomId('approve_button')
+          .setLabel('承認する')
+          .setStyle(ButtonStyle.Success);
 
-      const row = new ActionRowBuilder().addComponents(applyButton, approveButton);
+        const row = new ActionRowBuilder().addComponents(applyButton, approveButton);
 
-      await interaction.reply({
-        content: '経費申請をする場合は以下のボタンを押してください。承認者には「承認する」ボタンが表示されます。',
-        components: [row]
-      });
+        await interaction.reply({
+          content: '📋 経費申請をする場合は以下のボタンを押してください。\n承認者には「承認する」ボタンが表示されます。',
+          components: [row]
+        });
+      } catch (err) {
+        console.error('❌ 設置エラー:', err);
+        await interaction.reply({
+          content: 'メッセージの設置中にエラーが発生しました。',
+          ephemeral: true
+        });
+      }
     }
   }
 };
+

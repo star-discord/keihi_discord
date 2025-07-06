@@ -14,14 +14,20 @@ module.exports = {
   async execute(interaction) {
     const channel = interaction.channel;
 
+    // テキストチャンネル以外では実行不可
     if (!channel || channel.type !== ChannelType.GuildText) {
-      await interaction.reply({
-        content: 'このコマンドはテキストチャンネルでのみ使えます。',
-        ephemeral: true,
-      });
+      try {
+        await interaction.reply({
+          content: 'このコマンドはテキストチャンネルでのみ使用できます。',
+          ephemeral: true,
+        });
+      } catch (err) {
+        console.error('❌ リプライ送信エラー:', err);
+      }
       return;
     }
 
+    // 同様の案内メッセージがあれば削除
     try {
       const messages = await channel.messages.fetch({ limit: 50 });
       for (const msg of messages.values()) {
@@ -33,9 +39,10 @@ module.exports = {
         }
       }
     } catch (err) {
-      console.error('メッセージ取得失敗:', err);
+      console.error('❌ メッセージ取得/削除エラー:', err);
     }
 
+    // ボタン構築
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId('expense_apply_button')
@@ -43,10 +50,16 @@ module.exports = {
         .setStyle(ButtonStyle.Primary)
     );
 
-    await interaction.reply({
-      content: '経費申請をする場合は以下のボタンを押してください。',
-      components: [row],
-    });
+    // 案内メッセージ送信
+    try {
+      await interaction.reply({
+        content: '経費申請をする場合は以下のボタンを押してください。',
+        components: [row],
+      });
+    } catch (err) {
+      console.error('❌ メッセージ送信失敗:', err);
+    }
   },
 };
+
 
