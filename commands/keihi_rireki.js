@@ -16,7 +16,7 @@ module.exports = {
     try {
       const guildId = interaction.guildId;
 
-      // ✅ ログファイル（yyyy-mm）の一覧取得
+      // ログファイル（yyyy-mm）の一覧取得
       const yearMonthList = getAvailableExpenseFiles(guildId);
 
       if (!yearMonthList || yearMonthList.length === 0) {
@@ -53,3 +53,4 @@ module.exports = {
     }
   }
 };
+

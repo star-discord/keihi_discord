@@ -1,5 +1,4 @@
-// commands/keihi_setti.js
-
+// keihi_setti.js
 const {
   SlashCommandBuilder,
   ActionRowBuilder,
@@ -81,3 +80,4 @@ module.exports = {
     }
   }
 };
+

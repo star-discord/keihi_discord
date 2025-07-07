@@ -1,41 +1,26 @@
-#!/bin/bash
-
 echo "📦 Bot 更新処理を開始..."
 
 # PM2 Bot 停止
 echo "🛑 Bot 停止..."
-pm2 stop chat_gpt_bot
+pm2 stop 経費申請bot
 
-# 古い Bot フォルダ削除
-echo "🧹 古いフォルダ削除..."
-rm -rf ~/chat_gpt_bot
+# 古い Bot ディレクトリ削除
+echo "🧹 古い Bot ディレクトリを削除..."
+rm -rf ~/keihi_discord_bot
 
-# ZIP 解凍（中間ディレクトリに一旦展開）
+# ZIP 展開
 echo "📂 ZIP 解凍..."
-unzip -q ~/chat_gpt_bot.zip -d ~/chat_gpt_bot_tmp
+unzip -q ~/経費申請bot.zip -d ~/keihi_discord_bot_tmp
 
-# chat_gpt_bot フォルダが入れ子になっているのを修正
-mv ~/chat_gpt_bot_tmp/chat_gpt_bot ~/chat_gpt_bot
-rm -rf ~/chat_gpt_bot_tmp
+# 入れ子解消
+mv ~/keihi_discord_bot_tmp/keihi_discord_bot ~/keihi_discord_bot
+rm -rf ~/keihi_discord_bot_tmp
 
-# ZIP 削除
-echo "🗑️ ZIP 削除..."
-rm -f ~/chat_gpt_bot.zip
-
-# コマンド再デプロイ & 依存パッケージのインストール
-echo "📡 コマンド再デプロイ & 依存パッケージインストール..."
-cd ~/chat_gpt_bot
-
-# package.json 存在チェック
-if [ ! -f "package.json" ]; then
-  echo "❌ package.json が見つかりません。"
-  exit 1
-fi
-
-# npm install
+# 依存インストール
+cd ~/keihi_discord_bot
 npm install
 
-# deploy-commands.js 実行
+# コマンドデプロイ
 if [ -f "deploy-commands.js" ]; then
   node deploy-commands.js
 else
@@ -44,8 +29,12 @@ fi
 
 # PM2 再起動
 echo "🚀 PM2 再起動..."
-pm2 start index.js --name chat_gpt_bot
+pm2 start index.js --name 経費申請bot
 pm2 save
+
+# 最後に ZIP を削除！
+echo "🗑️ ZIP を削除..."
+rm -f ~/経費申請bot.zip
 
 echo "✅ Bot 更新完了 🎉"
 

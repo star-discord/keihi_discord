@@ -1,3 +1,5 @@
+// keihi_config.js
+
 const {
   SlashCommandBuilder,
   PermissionFlagsBits,
@@ -9,26 +11,26 @@ const {
 const {
   setApproverRoles,
   setVisibleRoles
-} = require('../utils/fileStorage');
+} = require('../utils/fileStorage');  // 役職データの保存処理
 
-const MESSAGES = require('../constants/messages');
+const MESSAGES = require('../constants/messages');  // メッセージ設定
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('経費申請設定')
     .setDescription('承認・表示ロールを設定します')
-    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),  // 管理者権限を必要とする
 
   async execute(interaction) {
     try {
       const approverMenu = new RoleSelectMenuBuilder()
-        .setCustomId('select_approver_roles')
+        .setCustomId('select_approver_roles')  // 承認ロール選択メニューのカスタムID
         .setPlaceholder('✅ 承認ロールを選択（必須）')
         .setMinValues(1)
         .setMaxValues(5);
 
       const visibleMenu = new RoleSelectMenuBuilder()
-        .setCustomId('select_visible_roles')
+        .setCustomId('select_visible_roles')  // 表示ロール選択メニューのカスタムID
         .setPlaceholder('👁 表示ロールを選択（任意）')
         .setMinValues(0)
         .setMaxValues(5);
@@ -37,18 +39,19 @@ module.exports = {
       const row2 = new ActionRowBuilder().addComponents(visibleMenu);
 
       await interaction.reply({
-        content: MESSAGES.ROLE.PROMPT,
-        components: [row1, row2],
+        content: MESSAGES.ROLE.PROMPT,  // メッセージのプロンプト
+        components: [row1, row2],  // ボタンなどのコンポーネントを表示
         ephemeral: true
       });
 
+      // ここでの interaction は、ボタンや選択メニューの処理
       const collector = interaction.channel.createMessageComponentCollector({
-        componentType: ComponentType.RoleSelect,
-        time: 60_000,
-        filter: i => i.user.id === interaction.user.id
+        componentType: ComponentType.RoleSelect,  // RoleSelect コンポーネントを利用
+        time: 60_000,  // 1分間
+        filter: i => i.user.id === interaction.user.id  // インタラクションしたユーザーに限定
       });
 
-      const selected = {};
+      const selected = {};  // 選択されたロールを保持
 
       collector.on('collect', async i => {
         if (i.customId === 'select_approver_roles') {
@@ -61,7 +64,7 @@ module.exports = {
           await i.reply({ content: '👁 表示ロールを受け取りました。', ephemeral: true });
         }
 
-        // 両方そろったら保存して完了
+        // 両方揃ったらデータを保存して完了
         if (selected.approverRoles && selected.visibleRoles !== undefined) {
           setApproverRoles(interaction.guildId, selected.approverRoles);
           setVisibleRoles(interaction.guildId, selected.visibleRoles);
@@ -73,7 +76,7 @@ module.exports = {
 
           await interaction.editReply({
             content: `${MESSAGES.ROLE.SET(roleMentions)}\n👁 表示ロール: ${visibleMentions}`,
-            components: []
+            components: []  // コンポーネント削除
           });
 
           collector.stop();
@@ -98,4 +101,3 @@ module.exports = {
     }
   }
 };
-
