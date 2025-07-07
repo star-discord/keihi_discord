@@ -16,7 +16,6 @@ module.exports = {
     try {
       const guildId = interaction.guildId;
 
-      // ログファイル（yyyy-mm）の一覧取得
       const yearMonthList = getAvailableExpenseFiles(guildId);
 
       if (!yearMonthList || yearMonthList.length === 0) {
@@ -26,10 +25,13 @@ module.exports = {
         });
       }
 
-      const options = yearMonthList.map(ym => ({
-        label: ym,
-        value: ym
-      }));
+      const options = yearMonthList
+        .filter(ym => ym && ym.trim())
+        .slice(0, 25)
+        .map(ym => ({
+          label: ym,
+          value: ym
+        }));
 
       const select = new StringSelectMenuBuilder()
         .setCustomId('history_year_month')

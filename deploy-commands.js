@@ -2,18 +2,12 @@
 const { REST, Routes } = require('discord.js');
 const dotenv = require('dotenv');
 const path = require('path');
-const loadCommands = require('./utils/loadCommands');
+const loadDeployCommands = require('./utils/loadDeployCommands');
 
 dotenv.config();
 
-// 🔽 commands フォルダから読み込み
 const commandsPath = path.join(__dirname, 'commands');
-const commandModules = loadCommands(commandsPath, 'deploy');
-
-// 🔽 Discord に送信する JSON 配列を生成
-const commands = commandModules
-  .filter(cmd => cmd?.data?.toJSON)
-  .map(cmd => cmd.data.toJSON);
+const commands = loadDeployCommands(commandsPath); // すでに toJSON 済み
 
 async function deployCommands() {
   const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
@@ -30,10 +24,11 @@ async function deployCommands() {
 
   try {
     const result = await rest.put(route, { body: commands });
-    console.log(`📤 ${isDevelopment ? '開発ギルド' : '全体'}に ${commands.length} 件のコマンドを登録しました`);
+    console.log(`✅ ${isDevelopment ? '開発ギルド' : '全体'}に ${commands.length} 件のコマンドを登録しました`);
   } catch (err) {
     console.error('❌ コマンド登録失敗:', err);
   }
 }
 
 deployCommands();
+
