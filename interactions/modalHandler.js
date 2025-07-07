@@ -1,37 +1,34 @@
-// modalHandler.js
-const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
-const { getApproverRoles } = require('../utils/fileStorage');
-const MESSAGES = require('../constants/messages');
+// interactions/modalHandler.js
+const { getApproverRoles } = require('../utils/fileStorage.js');
+const handleSubmit = require('./modals/submit.js');
 
 module.exports = async function handleModal(interaction) {
   try {
-    const customId = interaction.customId;
+    // 現在対応しているモーダルID
+    if (interaction.customId === 'expense_apply_modal') {
+      return await handleSubmit(interaction);
+    }
 
-    // モーダルで送信された内容を取得
-    const modalData = interaction.fields.getTextInputValue('modal_input_field'); // フィールド名は実際のモーダルに合わせる
-
-    // モーダル結果をログに出力（必要に応じて）
-    console.log(`モーダルデータ: ${modalData}`);
-
-    // 承認ボタンを作成
-    const approveButton = new ButtonBuilder()
-      .setCustomId('approve')
-      .setLabel('✅ 承認')
-      .setStyle(ButtonStyle.Success);
-
-    const row = new ActionRowBuilder().addComponents(approveButton);
-
-    // モーダル入力後にメッセージを編集し、承認ボタンを追加
-    await interaction.reply({
-      content: `${modalData}\n\n承認ボタンをクリックして申請を承認してください。`,
-      components: [row],
+    // 対応していないモーダルIDが来たときのログ
+    console.warn(`⚠️ 未対応のモーダルID: ${interaction.customId}`);
+    return await interaction.reply({
+      content: '⚠️ 未対応のモーダルです。',
+      ephemeral: true
     });
 
   } catch (err) {
     console.error('❌ モーダル処理エラー:', err);
-    await interaction.reply({
-      content: '⚠️ モーダルの処理中にエラーが発生しました。',
-      ephemeral: true
-    });
+    if (interaction.replied || interaction.deferred) {
+      await interaction.followUp({
+        content: '⚠️ モーダルの処理中にエラーが発生しました。',
+        ephemeral: true
+      });
+    } else {
+      await interaction.reply({
+        content: '⚠️ モーダルの処理中にエラーが発生しました。',
+        ephemeral: true
+      });
+    }
   }
 };
+

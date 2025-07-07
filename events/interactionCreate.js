@@ -1,7 +1,7 @@
 // events/interactionCreate.js
-const handleButton = require('../interactions/buttonHandler');
-const handleModal = require('../interactions/modalHandler');
-const handleSelectMenu = require('../interactions/selectMenuHandler');
+const handleButton = require('../interactions/buttonHandler.js');
+const handleModal = require('../interactions/modalHandler.js');
+const handleSelectMenu = require('../interactions/selectMenuHandler.js');
 
 function timestamp() {
   return new Date().toISOString();

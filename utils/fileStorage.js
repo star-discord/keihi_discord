@@ -96,7 +96,13 @@ function appendExpenseLog(guildId, yearMonth, entry) {
     console.warn('⚠️ 無効なログエントリが検出されました:', entry);
     return;
   }
+
   const filePath = getLogPath(guildId, yearMonth);
+
+  // 🔧 追加：必要なディレクトリを事前作成
+  ensureDirExists(getGuildDir(guildId));         // ギルドフォルダ
+  ensureDirExists(path.dirname(filePath));       // logs フォルダ
+
   const list = safeReadJson(filePath, []);
   list.push(entry);
   saveJson(filePath, list);
