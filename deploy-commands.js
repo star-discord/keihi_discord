@@ -1,46 +1,22 @@
-// deploy-commands.js (CommonJS版)
+// deploy-commands.js
 const { REST, Routes } = require('discord.js');
 const dotenv = require('dotenv');
-const fs = require('fs');
 const path = require('path');
+const loadCommands = require('./utils/loadCommands');
 
 dotenv.config();
 
-const commands = [];
+// 🔽 commands フォルダから読み込み
+const commandsPath = path.join(__dirname, 'commands');
+const commandModules = loadCommands(commandsPath, 'deploy');
 
-function loadCommands() {
-  const commandsPath = path.join(__dirname, 'commands');
-  let commandFiles;
-
-  try {
-    commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
-  } catch (err) {
-    console.error('❌ コマンドディレクトリ読み込みエラー:', err);
-    return;
-  }
-
-  for (const file of commandFiles) {
-    const filePath = path.join(commandsPath, file);
-    try {
-      const command = require(filePath);
-      const commandData = command.default ?? command;
-
-      if (commandData?.data?.toJSON) {
-        commands.push(commandData.data.toJSON());
-        console.log(`✅ コマンド読み込み成功: ${file}`);
-      } else {
-        console.warn(`⚠️ 無効なコマンド形式: ${file}`);
-      }
-    } catch (err) {
-      console.error(`❌ コマンド読み込み失敗 (${file}):`, err);
-    }
-  }
-}
+// 🔽 Discord に送信する JSON 配列を生成
+const commands = commandModules
+  .filter(cmd => cmd?.data?.toJSON)
+  .map(cmd => cmd.data.toJSON);
 
 async function deployCommands() {
   const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
-
-  loadCommands();
 
   if (commands.length === 0) {
     console.warn('⚠️ 登録対象のコマンドがありません。');
