@@ -23,5 +23,9 @@ module.exports = async function handleButton(interaction) {
     }
   }
 
-  console.warn(`⚠️ 未対応のボタン: ${customId}`);
-};
+console.warn(`⚠️ 未対応のボタン: ${customId}`);
+// その下に以下を追加（またはすでにある場合はコメントを削除）：
+await interaction.reply({
+  content: '⚠️ このボタンは古くて無効になっています。',
+  ephemeral: true,
+});
