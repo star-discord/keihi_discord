@@ -2,7 +2,7 @@
 const { REST, Routes } = require('discord.js');
 const dotenv = require('dotenv');
 const path = require('path');
-const loadDeployCommands = require('./utils/loadDeployCommands');
+const loadDeployCommands = require('./utils/loadDeployCommands.js');
 
 dotenv.config();
 

@@ -7,7 +7,7 @@ const {
 const {
   getApproverRoles,
   updateApprovalStatus
-} = require('../../utils/fileStorage');
+} = require('../../utils/fileStorage.js');
 
 module.exports = async function handleApproveButton(interaction) {
   const guildId = interaction.guildId;

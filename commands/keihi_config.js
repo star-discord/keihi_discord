@@ -11,9 +11,9 @@ const {
 const {
   setApproverRoles,
   setVisibleRoles
-} = require('../utils/fileStorage');  // 役職データの保存処理
+} = require('../utils/fileStorage.js');  // 役職データの保存処理
 
-const MESSAGES = require('../constants/messages');  // メッセージ設定
+const MESSAGES = require('../constants/messages.js');  // メッセージ設定
 
 module.exports = {
   data: new SlashCommandBuilder()

@@ -6,7 +6,7 @@ const {
   appendExpenseLog,
   getExpenseEntries,
   updateApprovalStatus
-} = require('../utils/fileStorage');
+} = require('../utils/fileStorage.js');
 
 const TEST_GUILD_ID = 'test-guild';
 const TEST_YEAR_MONTH = '2099-12'; // ダミーの未来日で競合防止

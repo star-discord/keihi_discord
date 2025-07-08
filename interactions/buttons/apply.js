@@ -1,4 +1,4 @@
-//apply
+// interactions/buttons/apply.js
 
 const {
   ModalBuilder,
@@ -6,6 +6,11 @@ const {
   TextInputStyle,
   ActionRowBuilder
 } = require('discord.js');
+
+const handleModalSubmit = require('../../modals/submit.js'); // ← `.js` 拡張子を追加
+const { getApproverRoles, getConfig } = require('../../utils/fileStorage.js');
+const { getThreadName } = require('../../utils/threadUtils.js');
+
 
 module.exports = async function handleApplyButton(interaction) {
   try {
@@ -31,25 +36,19 @@ module.exports = async function handleApplyButton(interaction) {
       .setStyle(TextInputStyle.Paragraph)
       .setRequired(false);
 
-    const row1 = new ActionRowBuilder().addComponents(itemInput);
-    const row2 = new ActionRowBuilder().addComponents(amountInput);
-    const row3 = new ActionRowBuilder().addComponents(detailInput);
-
-    modal.addComponents(row1, row2, row3);
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(itemInput),
+      new ActionRowBuilder().addComponents(amountInput),
+      new ActionRowBuilder().addComponents(detailInput)
+    );
 
     await interaction.showModal(modal);
   } catch (err) {
-    console.error('❌ モーダル表示中にエラーが発生:', err);
-    if (interaction.replied || interaction.deferred) {
-      await interaction.followUp({
-        content: '⚠️ モーダルの表示に失敗しました。',
-        ephemeral: true
-      });
-    } else {
-      await interaction.reply({
-        content: '⚠️ モーダルの表示に失敗しました。',
-        ephemeral: true
-      });
-    }
+    console.error('❌ モーダル表示エラー:', err);
+    await interaction.reply({
+      content: '⚠️ モーダルの表示中にエラーが発生しました。',
+      ephemeral: true
+    });
   }
 };
+

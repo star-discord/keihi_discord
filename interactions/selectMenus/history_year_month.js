@@ -1,7 +1,7 @@
 // history_year_month.js
 
 const { ChannelType } = require('discord.js');
-const { getExpenseEntries } = require('../../utils/fileStorage');
+const { getExpenseEntries } = require('../../utils/fileStorage.js');
 
 module.exports = async function handleHistorySelect(interaction) {
   if (interaction.customId !== 'history_year_month') return;

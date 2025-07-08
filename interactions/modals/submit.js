@@ -12,7 +12,7 @@ const {
   appendExpenseLog,
   getApproverRoles,
   getExpenseEntries
-} = require('../../utils/fileStorage');
+} = require('../../utils/fileStorage.js');
 
 const { getThreadName } = require('../../utils/threadUtils');
 
@@ -110,4 +110,3 @@ module.exports = async function handleModalSubmit(interaction) {
     });
   }
 };
-

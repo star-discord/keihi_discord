@@ -4,8 +4,8 @@ const {
   ActionRowBuilder
 } = require('discord.js');
 
-const { getAvailableExpenseFiles } = require('../utils/fileStorage');
-const MESSAGES = require('../constants/messages');
+const { getAvailableExpenseFiles } = require('../utils/fileStorage.js');
+const MESSAGES = require('../constants/messages.js');
 
 module.exports = {
   data: new SlashCommandBuilder()

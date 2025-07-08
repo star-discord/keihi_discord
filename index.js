@@ -3,7 +3,7 @@ const { Client, Collection, GatewayIntentBits } = require('discord.js');
 const dotenv = require('dotenv');
 const path = require('path');
 const fs = require('fs');
-const loadCommands = require('./utils/loadCommands');
+const loadCommands = require('./utils/loadCommands.js');
 
 dotenv.config();
 

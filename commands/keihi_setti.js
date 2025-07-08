@@ -7,8 +7,8 @@ const {
   ChannelType
 } = require('discord.js');
 
-const { getApproverRoles } = require('../utils/fileStorage');
-const MESSAGES = require('../constants/messages');
+const { getApproverRoles } = require('../utils/fileStorage.js');
+const MESSAGES = require('../constants/messages.js');
 
 module.exports = {
   data: new SlashCommandBuilder()

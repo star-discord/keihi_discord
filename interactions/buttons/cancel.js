@@ -1,6 +1,6 @@
 // interactions/buttons/cancel.js
 
-const { deleteExpenseEntry } = require('../../utils/fileStorage');
+const { deleteExpenseEntry } = require('../../utils/fileStorage.js');
 const dayjs = require('dayjs');
 
 module.exports = async function handleCancelButton(interaction) {
