@@ -1,7 +1,7 @@
 {
   "name": "discord-keihi-bot",
   "version": "0.3",
-  "description": "Discord 経費申請 Bot（ローカルファイル保存）",
+  "description": "Discord 経費申請 Bot",
   "main": "index.js",
   "type": "commonjs",
   "scripts": {
