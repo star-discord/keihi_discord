@@ -7,7 +7,7 @@ const {
   ActionRowBuilder
 } = require('discord.js');
 
-const handleModalSubmit = require('../../modals/submit.js'); // ← `.js` 拡張子を追加
+const handleModalSubmit = require('../modals/submit.js'); // ← `.js` 拡張子を追加
 const { getApproverRoles, getConfig } = require('../../utils/fileStorage.js');
 const { getThreadName } = require('../../utils/threadUtils.js');
 
