@@ -9,10 +9,21 @@
  * @returns {string} スレッド名
  */
 function getThreadName(baseName, count) {
+  const chunkSize = 500;
+
+  if (typeof baseName !== 'string') {
+    throw new TypeError('baseName must be a string');
+  }
+
+  baseName = baseName.trim();
+  if (!baseName) {
+    throw new Error('baseName must not be empty');
+  }
+
   if (typeof count !== 'number' || count < 0) count = 0;
 
-  const start = Math.floor(count / 500) * 500 + 1;
-  const end = start + 499;
+  const start = Math.floor(count / chunkSize) * chunkSize + 1;
+  const end = start + chunkSize - 1;
 
   return `${baseName}(${start}~${end})`;
 }
