@@ -8,10 +8,7 @@ const {
   ComponentType
 } = require('discord.js');
 
-const {
-  setApproverRoles,
-  setVisibleRoles
-} = require('../utils/fileStorage.js');  // 役職データの保存処理
+const { setApproverRoles, setVisibleRoles } = require('../../utils/fileStorage.js');
 
 const MESSAGES = require('../constants/messages.js');  // メッセージ設定
 
