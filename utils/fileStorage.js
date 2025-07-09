@@ -5,7 +5,6 @@ require('dotenv').config();
 const { getDataPath } = require('./pathUtils.js');
 const { createAndSaveSpreadsheet } = require('./spreadsheet.js');
 
-
 // ────────── 内部ユーティリティ ──────────
 function ensureDirExists(dirPath) {
   if (!fs.existsSync(dirPath)) {
@@ -41,11 +40,6 @@ function saveJson(filePath, data) {
 
 // ────────── 経費ログ処理 ──────────
 
-/**
- * 経費ログを追加保存します。
- * @param {string} guildId 
- * @param {object} entry 
- */
 function appendExpenseLog(guildId, entry) {
   const logDir = getDataPath(guildId, 'logs');
   const logFile = path.join(logDir, `${getMonth()}.json`);
@@ -56,22 +50,12 @@ function appendExpenseLog(guildId, entry) {
   saveJson(logFile, logs);
 }
 
-/**
- * 経費ログを取得します。
- * @param {string} guildId 
- * @param {string} yearMonth 
- * @param {string|null} userId 
- * @returns {Array}
- */
 function getExpenseEntries(guildId, yearMonth, userId = null) {
   const logFile = getDataPath(guildId, 'logs', `${yearMonth}.json`);
   const list = safeReadJson(logFile, []);
   return userId ? list.filter(e => e.userId === userId) : list;
 }
 
-/**
- * 最初のスレッド/スプレッドシート付きエントリを取得
- */
 function getFirstEntryWithLinks(guildId, yearMonth, userId) {
   const entries = getExpenseEntries(guildId, yearMonth, userId);
   return entries.find(e => e.threadMessageId || e.spreadsheetUrl) || null;
@@ -79,9 +63,6 @@ function getFirstEntryWithLinks(guildId, yearMonth, userId) {
 
 // ────────── スプレッドシート関連 ──────────
 
-/**
- * 指定年月のスプレッドシートURLを取得（1件目）
- */
 function getSpreadsheetUrl(guildId, yearMonth) {
   const logFile = getDataPath(guildId, 'logs', `${yearMonth}.json`);
   const entries = safeReadJson(logFile, []);
@@ -89,9 +70,6 @@ function getSpreadsheetUrl(guildId, yearMonth) {
   return entry?.spreadsheetUrl || null;
 }
 
-/**
- * URLがなければ自動生成して保存し、URLを返す
- */
 async function getOrCreateSpreadsheetUrl(guildId, yearMonth) {
   const existing = getSpreadsheetUrl(guildId, yearMonth);
   if (existing) return existing;
@@ -111,6 +89,22 @@ async function getOrCreateSpreadsheetUrl(guildId, yearMonth) {
   return newUrl;
 }
 
+// ────────── ロール設定関連 ──────────
+
+function setApproverRoles(guildId, roles) {
+  const configFile = getDataPath(guildId, 'config.json');
+  const config = safeReadJson(configFile, {});
+  config.approverRoles = roles;
+  saveJson(configFile, config);
+}
+
+function setVisibleRoles(guildId, roles) {
+  const configFile = getDataPath(guildId, 'config.json');
+  const config = safeReadJson(configFile, {});
+  config.visibleRoles = roles;
+  saveJson(configFile, config);
+}
+
 // ────────── エクスポート ──────────
 
 module.exports = {
@@ -118,6 +112,8 @@ module.exports = {
   getExpenseEntries,
   getFirstEntryWithLinks,
   getSpreadsheetUrl,
-  getOrCreateSpreadsheetUrl
+  getOrCreateSpreadsheetUrl,
+  setApproverRoles,
+  setVisibleRoles
 };
 
