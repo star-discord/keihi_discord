@@ -8,14 +8,10 @@ module.exports = {
     .setName('deploy')
     .setDescription('スラッシュコマンドを Discord に登録します（管理者用）'),
 
-  async execute(interaction) {
-    if (!interaction.member.permissions.has('Administrator')) {
-      return interaction.reply({
-        content: '⛔ このコマンドを実行する権限がありません。',
-        ephemeral: true
-      });
-    }
+  adminOnly: true, // ✅ 共通チェックのために追加
 
+  async execute(interaction) {
+    // ✅ ここでの重複チェックは不要（interactionCreate側で共通化済）
     const commands = [];
     const commandsPath = path.join(__dirname, '..', '..');
 

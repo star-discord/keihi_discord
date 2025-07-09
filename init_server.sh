@@ -1,22 +1,33 @@
 #!/bin/bash
 
-echo "🚀 Bot起動処理開始"
+echo "🔧 GCPインスタンス初期化開始"
 
-# data存在チェック
-if [ ! -d ~/keihi_discord/data ]; then
-  echo "⚠️ data フォルダが見つかりません。空のフォルダを作成します"
-  mkdir -p ~/keihi_discord/data
-else
-  # 自動バックアップ
-  TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-  cp -r ~/keihi_discord/data ~/data_backup_$TIMESTAMP
-  echo "📂 data をバックアップしました: ~/data_backup_$TIMESTAMP"
+# Node.js & npm & PM2
+echo "📦 Node.js + PM2 をインストール"
+sudo apt update
+sudo apt install -y nodejs npm git
+sudo npm install -g pm2
+
+# nvm 経由で Node.js 推奨版をインストールする場合（任意）
+# curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+# source ~/.nvm/nvm.sh
+# nvm install 18
+# nvm use 18
+
+# Botディレクトリに移動
+cd ~/keihi_discord || exit
+
+# パッケージインストール
+npm install
+
+# .env がない場合は例から生成
+if [ ! -f .env ]; then
+  cp .env.example .env
+  echo "⚠️ .env を作成しました。中身を編集してください。"
 fi
 
-# 起動
-cd ~/keihi_discord
-npm install
-pm2 start ecosystem.config.cjs
+# PM2 に登録
+pm2 start index.js --name keihi-bot
 pm2 save
 
-echo "✅ Bot起動完了"
+echo "✅ 初期化完了 & Bot 起動済み"

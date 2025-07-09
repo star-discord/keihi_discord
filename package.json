@@ -1,6 +1,6 @@
 {
   "name": "discord-keihi-bot",
-  "version": "0.3",
+  "version": "0.4.0",
   "description": "Discord 経費申請 Bot",
   "main": "index.js",
   "type": "commonjs",
@@ -33,5 +33,23 @@
     "url": "https://github.com/redstar-hr/discord-keihi-bot/issues"
   },
   "author": "redstar hr <redstar.hoshir@gmail.com>",
-  "license": "MIT"
+  "license": "MIT",
+  "keywords": [
+    "discord",
+    "bot",
+    "経費",
+    "申請",
+    "Google Sheets",
+    "pm2",
+    "mocha",
+    "nodejs"
+  ],
+  "files": [
+    ".env.example",
+    "index.js",
+    "commands/",
+    "events/",
+    "utils/",
+    "tests/"
+  ]
 }

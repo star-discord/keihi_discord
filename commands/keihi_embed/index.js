@@ -1,9 +1,17 @@
-const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const {
+  SlashCommandBuilder,
+  EmbedBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle
+} = require('discord.js');
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('経費申請embed')
     .setDescription('経費申請botでメッセージ送信ができます'), 
+
+  adminOnly: true, // ✅ 管理者専用として制限
 
   async execute(interaction) {
     const embed = new EmbedBuilder()
@@ -21,7 +29,7 @@ module.exports = {
     await interaction.reply({
       embeds: [embed],
       components: [row],
-      ephemeral: false, // 公開 or 管理用に true も可
+      ephemeral: false, // ✅ 公開チャンネルに送信（管理用なら true でも可）
     });
   },
 };

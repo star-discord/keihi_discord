@@ -1,29 +1,53 @@
-// commands/keihi_setti/setup_create_forum.js
-const {
-  ModalBuilder,
-  TextInputBuilder,
-  TextInputStyle,
-  ActionRowBuilder
-} = require('discord.js');
+// commands/dev/deploy.js
+const { SlashCommandBuilder } = require('discord.js');
+const fs = require('fs');
+const path = require('path');
 
 module.exports = {
-  data: {
-    customId: 'setup_create_forum',
-  },
+  data: new SlashCommandBuilder()
+    .setName('deploy')
+    .setDescription('スラッシュコマンドを Discord に登録します（管理者用）'),
+
+  adminOnly: true, // ✅ 共通チェックのために追加
 
   async execute(interaction) {
-    const modal = new ModalBuilder()
-      .setCustomId('setup_create_forum_modal')
-      .setTitle('経費申請フォーラム本文の入力');
+    // ✅ ここでの重複チェックは不要（interactionCreate側で共通化済）
+    const commands = [];
+    const commandsPath = path.join(__dirname, '..', '..');
 
-    const bodyInput = new TextInputBuilder()
-      .setCustomId('body')
-      .setLabel('経費申請フォーラムに表示する本文')
-      .setStyle(TextInputStyle.Paragraph)
-      .setRequired(true);
+    const walk = (dir) => {
+      const entries = fs.readdirSync(dir, { withFileTypes: true });
+      for (const entry of entries) {
+        const fullPath = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          walk(fullPath);
+        } else if (entry.isFile() && entry.name.endsWith('.js')) {
+          const command = require(fullPath);
+          if (command.data && typeof command.execute === 'function') {
+            commands.push(command.data.toJSON());
+          }
+        }
+      }
+    };
 
-    modal.addComponents(new ActionRowBuilder().addComponents(bodyInput));
+    walk(commandsPath);
 
-    await interaction.showModal(modal);
-  },
+    try {
+      const guild = interaction.guild;
+      await guild.commands.set(commands);
+
+      await interaction.reply({
+        content: `✅ ${commands.length} 件のコマンドを \`${guild.name}\` に登録しました。`,
+        ephemeral: true
+      });
+
+      console.log(`🆕 /deploy により ${guild.name} にコマンド登録 (${commands.length}件)`);
+    } catch (err) {
+      console.error('❌ コマンド登録失敗:', err);
+      await interaction.reply({
+        content: '⚠️ コマンドの登録に失敗しました。',
+        ephemeral: true
+      });
+    }
+  }
 };
