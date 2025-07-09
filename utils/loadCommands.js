@@ -1,10 +1,9 @@
-// utils/loadCommands.js
 const fs = require('fs');
 const path = require('path');
 
 /**
  * commands フォルダを再帰的に読み込み
- * 
+ *
  * @param {string} commandsPath - 読み込むディレクトリ
  * @param {Object} options
  * @param {string} [options.mode='index'] - ログ出力用
@@ -14,35 +13,39 @@ const path = require('path');
 function loadCommands(commandsPath, { mode = 'index', toJSON = false } = {}) {
   const commands = [];
 
-  const entries = fs.readdirSync(commandsPath, { withFileTypes: true });
+  function walk(dir) {
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
 
-  for (const entry of entries) {
-    if (!entry.isDirectory()) continue;
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
 
-    const subFile = path.join(commandsPath, entry.name, `${entry.name}.js`);
-    if (!fs.existsSync(subFile)) continue;
+      if (entry.isDirectory()) {
+        walk(fullPath); // 再帰的にディレクトリ探索
+      } else if (entry.isFile() && entry.name.endsWith('.js')) {
+        try {
+          const command = require(fullPath);
+          const commandData = command.default ?? command;
 
-    try {
-      const command = require(subFile);
-      const commandData = command.default ?? command;
+          const name = commandData?.data?.name;
+          const execute = commandData?.execute;
 
-      const name = commandData?.data?.name;
-      const execute = commandData?.execute;
+          if (typeof name !== 'string') throw new Error(`.data.name が無効`);
+          if (typeof execute !== 'function') throw new Error(`.execute が無効`);
 
-      if (typeof name !== 'string') throw new Error(`.data.name が無効`);
-      if (typeof execute !== 'function') throw new Error(`.execute が無効`);
+          const result = toJSON ? commandData.data.toJSON() : commandData;
+          commands.push(result);
 
-      const result = toJSON ? commandData.data.toJSON() : commandData;
-      commands.push(result);
-
-      console.log(`✅ [${mode}] コマンド読み込み: ${entry.name}/${entry.name}.js`);
-    } catch (err) {
-      console.error(`❌ [${mode}] 読み込み失敗 (${entry.name}):`, err.message);
+          const relativePath = path.relative(commandsPath, fullPath);
+          console.log(`✅ [${mode}] コマンド読み込み: ${relativePath}`);
+        } catch (err) {
+          console.error(`❌ [${mode}] 読み込み失敗 (${entry.name}):`, err.message);
+        }
+      }
     }
   }
 
+  walk(commandsPath);
   return commands;
 }
 
 module.exports = loadCommands;
-
