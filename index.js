@@ -1,104 +1,44 @@
 // index.js
 const fs = require('fs');
 const path = require('path');
-const { getDataPath } = require('./utils/pathUtils.js');
-const { getExpenseEntries } = require('./utils/fileStorage.js'); // ← これを追加
-const { createSpreadsheet, appendEntry, initSheets } = require('./utils/spreadsheet.js');
-const { google } = require('googleapis');
-const drive = google.drive('v3');
+const { Client, Collection, GatewayIntentBits, Events } = require('discord.js');
+require('dotenv').config();
 
-async function setReadOnlyPermission(spreadsheetId) {
-  try {
-    await drive.permissions.create({
-      fileId: spreadsheetId,
-      requestBody: {
-        role: 'reader',
-        type: 'anyone'
-      }
-    });
-    console.log(`🔒 スプレッドシートを閲覧専用に設定しました`);
-  } catch (err) {
-    console.error(`❌ パーミッション設定失敗:`, err);
-  }
-}
+const { initServer } = require('./utils/initUtils.js');
+const { loadCommands } = require('./utils/loadCommands.js');
 
-async function createMonthlySpreadsheet(guildId, yearMonth) {
-  await initSheets();
+// ✅ クライアント初期化
+const client = new Client({
+  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
+});
 
-  const entries = getExpenseEntries(guildId, yearMonth);
-  if (!entries.length) {
-    console.warn(`📭 ${yearMonth}: 申請ログが見つかりません`);
-    return null;
-  }
+client.commands = new Collection();
 
-  const spreadsheetTitle = `${yearMonth} 経費申請ログ (${guildId})`;
-  const headers = ['ユーザー名', '日時', '経費項目', '金額', '詳細', '承認状況'];
-  const spreadsheetId = await createSpreadsheet(spreadsheetTitle, headers);
-  const spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}`;
+// ✅ コマンド読み込み
+loadCommands(client);
 
-  for (const entry of entries) {
-    const username = entry.userName || '不明';
-    const timestamp = entry.timestamp || '';
-    const item = entry.item || '';
-    const amount = Number(entry.amount || 0); // 数値として書き込み
-    const detail = entry.detail || '';
+// ✅ イベント読み込み
+client.once(Events.ClientReady, async () => {
+  console.log(`✅ ログイン成功: ${client.user.tag}`);
+  await initServer(client);
+});
 
-    const approved = entry.approvedBy || [];
-    const approvedCount = approved.length;
-    const approverNames = approved.map(a => a.username).join(', ') || 'なし';
-    const statusEmoji = approvedCount > 0 ? '✅' : '❌';
-    const approvalStatus = `${statusEmoji} (${approvedCount}/3): ${approverNames}`;
+client.on(Events.InteractionCreate, async (interaction) => {
+  if (!interaction.isCommand()) return;
 
-    await appendEntry(spreadsheetId, {
-      username,
-      timestamp,
-      item,
-      amount,
-      detail,
-      approvalStatus
-    });
-  }
-
-  // ✅ 集計行を追加（最終行）
-  const totalFormula = `=SUM(D2:D${entries.length + 1})`; // D列 = 金額列
-  const countLabel = `件数: ${entries.length}件`;
-
-  await appendEntry(spreadsheetId, {
-    username: '',
-    timestamp: '',
-    item: '合計',
-    amount: totalFormula,
-    detail: countLabel,
-    approvalStatus: ''
-  });
-
-  // ✅ URL を保存
-  const filePath = getDataPath(guildId, 'logs', `${yearMonth}.json`);
-  const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-  data[0].spreadsheetUrl = spreadsheetUrl;
-  fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
-
-  // ✅ 閲覧専用に設定
-  await setReadOnlyPermission(spreadsheetId);
-
-  console.log(`✅ スプレッドシート作成: ${spreadsheetUrl}`);
-  return spreadsheetUrl;
-}
-
-async function createMonthlySpreadsheetIfNeeded(guildId, yearMonth) {
-  const filePath = getDataPath(guildId, 'logs', `${yearMonth}.json`);
-  if (!fs.existsSync(filePath)) return;
-
-  const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-  if (data[0]?.spreadsheetUrl) {
-    console.log(`🟡 ${yearMonth}: 既にスプレッドシートURLあり → スキップ`);
+  const command = client.commands.get(interaction.commandName);
+  if (!command) {
+    console.warn(`⚠️ 未登録のコマンド: ${interaction.commandName}`);
     return;
   }
 
-  await createMonthlySpreadsheet(guildId, yearMonth);
-}
+  try {
+    await command.execute(interaction);
+  } catch (error) {
+    console.error(`❌ コマンド実行失敗:`, error);
+    await interaction.reply({ content: 'コマンド実行時にエラーが発生しました。', ephemeral: true });
+  }
+});
 
-module.exports = {
-  createMonthlySpreadsheet,
-  createMonthlySpreadsheetIfNeeded
-};
+// ✅ ログイン
+client.login(process.env.DISCORD_TOKEN);
