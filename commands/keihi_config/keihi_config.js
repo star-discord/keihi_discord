@@ -10,7 +10,7 @@ const {
 
 const { setApproverRoles, setVisibleRoles } = require('../../utils/fileStorage.js');
 
-const MESSAGES = require('../constants/messages.js');  // メッセージ設定
+const MESSAGES = require('../../constants/messages.js');
 
 module.exports = {
   data: new SlashCommandBuilder()
