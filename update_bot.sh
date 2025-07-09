@@ -20,6 +20,13 @@ git pull origin main || {
 echo "📦 npm install 実行"
 npm install
 
+# スラッシュコマンド デプロイ
+echo "📡 スラッシュコマンドをデプロイ中..."
+node deploy-commands.js || {
+  echo "❌ スラッシュコマンドのデプロイに失敗しました。"
+  exit 1
+}
+
 # PM2 再起動
 echo "🔁 PM2 再起動"
 pm2 restart keihi-bot
@@ -30,3 +37,4 @@ echo "📄 最新ログ"
 pm2 logs --lines 10
 
 echo "✅ 経費申請Bot 更新完了"
+
