@@ -19,7 +19,7 @@ module.exports = {
     if (!channel || channel.type !== ChannelType.GuildText) {
       return interaction.reply({
         content: '⚠️ テキストチャンネルでのみ使用できます。',
-        ephemeral: true
+        flags: 64
       });
     }
 

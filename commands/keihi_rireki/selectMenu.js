@@ -56,13 +56,13 @@ module.exports = async function handleHistorySelect(interaction) {
   if (!embeds.length) {
     return interaction.reply({
       content: '📭 表示できる履歴がありませんでした。',
-      ephemeral: true
+      flags: 64
     });
   }
 
   await interaction.reply({
     embeds,
-    ephemeral: true
+    flags: 64
   });
 };
 

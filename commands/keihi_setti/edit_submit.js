@@ -17,13 +17,13 @@ module.exports = async function handleEditModal(interaction) {
 
   const amount = parseInt(amountRaw, 10);
   if (isNaN(amount) || amount < 0) {
-    return interaction.reply({ content: '⛔ 金額は正の数字で入力してください。', ephemeral: true });
+    return interaction.reply({ content: '⛔ 金額は正の数字で入力してください。', flags: 64 });
   }
 
   // 🔄 元メッセージ取得
   const originalMsg = await interaction.channel.messages.fetch(messageId).catch(() => null);
   if (!originalMsg) {
-    return interaction.reply({ content: '❌ 元メッセージが見つかりません。', ephemeral: true });
+    return interaction.reply({ content: '❌ 元メッセージが見つかりません。', flags: 64 });
   }
 
   const oldEmbed = originalMsg.embeds[0];
@@ -65,7 +65,7 @@ module.exports = async function handleEditModal(interaction) {
 
   await interaction.reply({
     content: '🖊️ 申請内容を修正しました。',
-    ephemeral: true
+    flags: 64
   });
 };
 

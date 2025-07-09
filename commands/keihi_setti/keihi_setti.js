@@ -28,7 +28,7 @@ module.exports = {
     await interaction.reply({
       embeds: [embed],
       components: [row],
-      ephemeral: true // 自分にだけ見える
+      flags: 64 // 自分にだけ見える
     });
   },
 };

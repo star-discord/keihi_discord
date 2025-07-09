@@ -22,7 +22,7 @@ module.exports = async function handleApproveButton(interaction) {
   if (!hasApproverRole) {
     return interaction.reply({
       content: '⛔ あなたは承認権限を持っていません。',
-      ephemeral: true
+      flags: 64
     });
   }
 
@@ -65,7 +65,7 @@ module.exports = async function handleApproveButton(interaction) {
     try {
       await interaction.reply({
         content: '⚠️ 承認処理に失敗しました。',
-        ephemeral: true
+        flags: 64
       });
     } catch (e) {
       console.error('❌ 応答メッセージ送信失敗:', e);

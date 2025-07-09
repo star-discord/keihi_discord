@@ -19,7 +19,7 @@ module.exports = {
     if (!yearMonths.length) {
       return interaction.reply({
         content: '📭 表示できる履歴がまだありません。',
-        ephemeral: true
+        flags: 64
       });
     }
 
@@ -39,7 +39,7 @@ module.exports = {
     await interaction.reply({
       content: '📆 表示したい履歴の月を選んでください（最大12件まで）',
       components: [row],
-      ephemeral: true
+      flags: 64
     });
   }
 };

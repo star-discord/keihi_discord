@@ -19,7 +19,7 @@ module.exports = {
     if (!embed) {
       return interaction.reply({
         content: '❌ 修正対象の申請情報が見つかりません。',
-        ephemeral: true
+        flags: 64
       });
     }
 

@@ -32,7 +32,7 @@ module.exports = async function handleCancelButton(interaction) {
     if (!entry || entry.userId !== userId) {
       return await interaction.reply({
         content: '❌ この申請は取り消せません（他の人の申請か、ログに存在しません）。',
-        ephemeral: true
+        flags: 64
       });
     }
 
@@ -41,7 +41,7 @@ module.exports = async function handleCancelButton(interaction) {
     if (!deleted) {
       return await interaction.reply({
         content: '⚠️ ログの削除に失敗しました。',
-        ephemeral: true
+        flags: 64
       });
     }
 
@@ -76,7 +76,7 @@ module.exports = async function handleCancelButton(interaction) {
     // ✅ 実行者に通知
     await interaction.reply({
       content: '🗑️ 経費申請を取り消しました。',
-      ephemeral: true
+      flags: 64
     });
 
   } catch (err) {
@@ -84,7 +84,7 @@ module.exports = async function handleCancelButton(interaction) {
     try {
       await interaction.reply({
         content: '⚠️ 経費申請の取り消し中にエラーが発生しました。',
-        ephemeral: true
+        flags: 64
       });
     } catch (e) {
       console.error('⚠️ エラーレスポンス送信失敗:', e);

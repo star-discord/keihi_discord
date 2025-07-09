@@ -31,6 +31,6 @@ module.exports = {
       )
       .setFooter({ text: 'STAR管理bot © 2025' });
 
-    await interaction.reply({ embeds: [embed], ephemeral: true });
+    await interaction.reply({ embeds: [embed], flags: 64 });
   }
 };

@@ -38,7 +38,7 @@ module.exports = {
       await interaction.reply({
         content: MESSAGES.ROLE.PROMPT,  // メッセージのプロンプト
         components: [row1, row2],  // ボタンなどのコンポーネントを表示
-        ephemeral: true
+        flags: 64
       });
 
       // ここでの interaction は、ボタンや選択メニューの処理
@@ -53,12 +53,12 @@ module.exports = {
       collector.on('collect', async i => {
         if (i.customId === 'select_approver_roles') {
           selected.approverRoles = i.values;
-          await i.reply({ content: '✅ 承認ロールを受け取りました。', ephemeral: true });
+          await i.reply({ content: '✅ 承認ロールを受け取りました。', flags: 64 });
         }
 
         if (i.customId === 'select_visible_roles') {
           selected.visibleRoles = i.values;
-          await i.reply({ content: '👁 表示ロールを受け取りました。', ephemeral: true });
+          await i.reply({ content: '👁 表示ロールを受け取りました。', flags: 64 });
         }
 
         // 両方揃ったらデータを保存して完了
@@ -93,7 +93,7 @@ module.exports = {
       console.error('❌ ロール設定エラー:', err);
       await interaction.reply({
         content: MESSAGES.GENERAL.ERROR,
-        ephemeral: true
+        flags: 64
       });
     }
   }

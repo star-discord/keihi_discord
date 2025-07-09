@@ -28,7 +28,7 @@ module.exports = async function handleModalSubmit(interaction) {
     if (isNaN(amount) || amount < 0) {
       return await interaction.reply({
         content: '⛔ 金額は半角の正の数字で入力してください。',
-        ephemeral: true
+        flags: 64
       });
     }
 
@@ -137,14 +137,14 @@ module.exports = async function handleModalSubmit(interaction) {
     // 📬 申請者にスプレッドシートURLを表示
     await interaction.reply({
       content: `✅ 経費申請を受け付けました。\n📎 あなた専用の履歴URLはこちら：\n${spreadsheetUrl}`,
-      ephemeral: true
+      flags: 64
     });
 
   } catch (err) {
     console.error('❌ モーダル送信処理エラー:', err);
     await interaction.reply({
       content: '⚠️ 経費申請の送信中にエラーが発生しました。',
-      ephemeral: true
+      flags: 64
     });
   }
 };

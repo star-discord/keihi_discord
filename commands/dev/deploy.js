@@ -38,7 +38,7 @@ module.exports = {
 
       await interaction.reply({
         content: `✅ ${commands.length} 件のコマンドを \`${guild.name}\` に登録しました。`,
-        ephemeral: true
+        flags: 64
       });
 
       console.log(`🆕 /deploy により ${guild.name} にコマンド登録 (${commands.length}件)`);
@@ -46,7 +46,7 @@ module.exports = {
       console.error('❌ コマンド登録失敗:', err);
       await interaction.reply({
         content: '⚠️ コマンドの登録に失敗しました。',
-        ephemeral: true
+        flags: 64
       });
     }
   }
