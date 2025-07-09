@@ -28,8 +28,8 @@ module.exports = {
 
     await interaction.reply({
       embeds: [embed],
-      components: [row],
-      ephemeral: false, // ✅ 公開チャンネルに送信（管理用なら true でも可）
+      components: [row]
+      // flags: 0 ← 明示してもOKだが省略可
     });
   },
 };
