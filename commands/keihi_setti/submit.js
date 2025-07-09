@@ -14,7 +14,7 @@ const {
 } = require('../../utils/fileStorage.js');
 
 const { getThreadName } = require('../../utils/threadUtils.js');
-const { createSpreadsheetAndGetUrl } = require('../../utils/spreadsheetUtils.js');
+const { createAndSaveSpreadsheet } = require('../../utils/spreadsheet.js');
 
 module.exports = async function handleModalSubmit(interaction) {
   if (interaction.customId !== 'expense_apply_modal') return;
