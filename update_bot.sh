@@ -1,26 +1,23 @@
 #!/bin/bash
 
-echo "📦 Bot更新開始"
+echo "🚀 経費申請Bot 更新処理開始"
 
-# 停止
-pm2 stop ecosystem.config.cjs
+# バックアップ（古いコードを保存）
+DATE=$(date '+%Y%m%d_%H%M')
+BACKUP_DIR="$HOME/keihi_discord_backup_$DATE"
 
-# data バックアップ
-TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-cp -r ~/keihi_discord/data ~/data_backup_$TIMESTAMP
-echo "✅ data バックアップ: data_backup_$TIMESTAMP"
+echo "📁 バックアップ作成: $BACKUP_DIR"
+cp -r ~/keihi_discord "$BACKUP_DIR"
 
-# ZIP 解凍 & 上書き
-unzip -o ~/経費申請bot.zip -d ~
-rm -rf ~/keihi_discord
-mv ~/経費申請bot ~/keihi_discord
-cp -r ~/data_backup_$TIMESTAMP ~/keihi_discord/data
+# Git Pull（または rsync/scpで最新コードを上書きする場合）
+cd ~/keihi_discord || exit
+git pull origin main
 
-# 再構築
-cd ~/keihi_discord
-npm install
-pm2 start ecosystem.config.cjs
-pm2 save
+# PM2 再起動
+echo "🔁 PM2再起動"
+pm2 restart keihi-bot
 
-echo "✅ Bot更新完了"
+# ログ確認（オプション）
+pm2 logs --lines 10
 
+echo "✅ 経費申請Bot 更新完了"
