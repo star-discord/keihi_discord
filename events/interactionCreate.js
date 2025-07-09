@@ -55,13 +55,18 @@ module.exports = {
         return handleSelectMenu(interaction, client);
       }
 
+      if (interaction.isRoleSelectMenu()) {
+        console.log(`[${timestamp()}] 🧩 [RoleSelect] ${interaction.customId} by ${userTag}`);
+        return handleSelectMenu(interaction, client);
+      }
+
       console.log(`[${timestamp()}] ❔ [Unknown Interaction] type=${interaction.type} by ${userTag}`);
 
     } catch (err) {
       console.error(`[${timestamp()}] ❌ interactionCreate エラー:`, err);
 
       try {
-        const replyContent = { content: '⚠️ エラーが発生しました。', ephemeral: true };
+        const replyContent = { content: '⚠️ エラーが発生しました。', flags: 64 };
         if (interaction.replied || interaction.deferred) {
           await interaction.followUp(replyContent);
         } else {
@@ -73,3 +78,4 @@ module.exports = {
     }
   }
 };
+
