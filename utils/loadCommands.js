@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 /**
- * 指定フォルダ内のすべてのコマンドを読み込む（サブフォルダ対応）
+ * 指定フォルダ内のすべてのコマンドを読み込む（サブフォルダ内の単一ファイル対応）
  * @param {string} commandsPath - 読み込むコマンドフォルダ（例: ./commands）
  * @param {string} mode - ログ出力モード（例: 'index', 'deploy'）
  * @returns {Array} 有効なコマンドモジュールの配列
@@ -16,20 +16,17 @@ function loadCommands(commandsPath, mode = 'index') {
     let filePath;
     let label;
 
-    if (entry.isFile() && entry.name.endsWith('.js')) {
-      // commands/foo.js
-      filePath = path.join(commandsPath, entry.name);
-      label = entry.name;
-    } else if (entry.isDirectory()) {
-      const indexPath = path.join(commandsPath, entry.name, 'index.js');
-      if (fs.existsSync(indexPath)) {
-        filePath = indexPath;
-        label = `${entry.name}/index.js`;
+    if (entry.isDirectory()) {
+      // 例: keihi_embed/keihi_embed.js
+      const commandFile = path.join(commandsPath, entry.name, `${entry.name}.js`);
+      if (fs.existsSync(commandFile)) {
+        filePath = commandFile;
+        label = `${entry.name}/${entry.name}.js`;
       } else {
-        continue; // index.js がないサブフォルダはスキップ
+        continue;
       }
     } else {
-      continue;
+      continue; // ファイル直下は読み込まない（全てサブディレクトリ方式に統一するなら）
     }
 
     try {
