@@ -1,27 +1,14 @@
-// index.js
+// utils/sheetGenerator.js
+
 const fs = require('fs');
 const path = require('path');
 const { getExpenseEntries } = require('./fileStorage.js');
 const { getDataPath } = require('./pathUtils.js');
 const { createSpreadsheet, appendEntry, initSheets } = require('./spreadsheet.js');
-const { google } = require('googleapis');
-const drive = google.drive('v3');
 
-async function setReadOnlyPermission(spreadsheetId) {
-  try {
-    await drive.permissions.create({
-      fileId: spreadsheetId,
-      requestBody: {
-        role: 'reader',
-        type: 'anyone'
-      }
-    });
-    console.log(`🔒 スプレッドシートを閲覧専用に設定しました`);
-  } catch (err) {
-    console.error(`❌ パーミッション設定失敗:`, err);
-  }
-}
-
+/**
+ * 指定月の全申請を Google Sheets に出力し、最初のエントリに URL を追記
+ */
 async function createMonthlySpreadsheet(guildId, yearMonth) {
   await initSheets();
 
@@ -32,15 +19,21 @@ async function createMonthlySpreadsheet(guildId, yearMonth) {
   }
 
   const spreadsheetTitle = `${yearMonth} 経費申請ログ (${guildId})`;
-  const headers = ['ユーザー名', '日時', '経費項目', '金額', '詳細', '承認状況'];
-  const spreadsheetId = await createSpreadsheet(spreadsheetTitle, headers);
+  const spreadsheetId = await createSpreadsheet(spreadsheetTitle, [
+    'ユーザー名',
+    '経費項目',
+    '金額',
+    '詳細',
+    '承認状況'
+  ]);
+
   const spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}`;
 
   for (const entry of entries) {
     const username = entry.userName || '不明';
-    const timestamp = entry.timestamp || '';
     const item = entry.item || '';
-    const amount = Number(entry.amount || 0); // 数値として書き込み
+    const amount = Number(entry.amount || 0);
+    const formattedAmount = `¥${amount.toLocaleString('ja-JP')}`;
     const detail = entry.detail || '';
 
     const approved = entry.approvedBy || [];
@@ -51,40 +44,26 @@ async function createMonthlySpreadsheet(guildId, yearMonth) {
 
     await appendEntry(spreadsheetId, {
       username,
-      timestamp,
       item,
-      amount,
+      amount: formattedAmount,
       detail,
       approvalStatus
     });
   }
 
-  // ✅ 集計行を追加（最終行）
-  const totalFormula = `=SUM(D2:D${entries.length + 1})`; // D列 = 金額列
-  const countLabel = `件数: ${entries.length}件`;
-
-  await appendEntry(spreadsheetId, {
-    username: '',
-    timestamp: '',
-    item: '合計',
-    amount: totalFormula,
-    detail: countLabel,
-    approvalStatus: ''
-  });
-
-  // ✅ URL を保存
+  // ✅ 最初のログに URL を保存
   const filePath = getDataPath(guildId, 'logs', `${yearMonth}.json`);
   const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
   data[0].spreadsheetUrl = spreadsheetUrl;
   fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
 
-  // ✅ 閲覧専用に設定
-  await setReadOnlyPermission(spreadsheetId);
-
   console.log(`✅ スプレッドシート作成: ${spreadsheetUrl}`);
   return spreadsheetUrl;
 }
 
+/**
+ * すでにURLが存在する場合はスキップする安全版
+ */
 async function createMonthlySpreadsheetIfNeeded(guildId, yearMonth) {
   const filePath = getDataPath(guildId, 'logs', `${yearMonth}.json`);
   if (!fs.existsSync(filePath)) return;

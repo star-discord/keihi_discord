@@ -1,62 +1,90 @@
 // utils/spreadsheetUtills.js
 
-const fs = require('fs');
-const path = require('path');
+const { google } = require('googleapis');
+const { getOrCreateGuildFolder } = require('./driveUtils.js');
+require('dotenv').config();
 
-// 経費データをスプレッドシート（CSV）として保存
-function saveToSpreadsheet({ guildId, guildName, channelName, yearMonth, data }) {
-  const safeGuildName = sanitizeFileName(guildName);
-  const safeChannelName = sanitizeFileName(channelName);
-  const fileName = `${safeChannelName}_${safeGuildName}_${yearMonth}.csv`;
-  const dirPath = path.join(__dirname, '..', 'data', guildId);
-  const filePath = path.join(dirPath, fileName);
+const auth = new google.auth.GoogleAuth({
+  keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS,
+  scopes: ['https://www.googleapis.com/auth/drive', 'https://www.googleapis.com/auth/spreadsheets']
+});
 
-  // ディレクトリがなければ作成
-  if (!fs.existsSync(dirPath)) {
-    fs.mkdirSync(dirPath, { recursive: true });
-  }
+async function createAndSaveSpreadsheet(guildId, yearMonth, entries) {
+  const authClient = await auth.getClient();
+  const sheets = google.sheets({ version: 'v4', auth: authClient });
+  const drive = google.drive({ version: 'v3', auth: authClient });
 
-  const headers = ['申請者', '項目', '金額', '詳細', '申請日時'];
-  const row = [
-    data.userName,
-    data.item,
-    `¥${data.amount.toLocaleString()}`,
-    data.detail,
-    formatDateTime(data.timestamp)
+  const folderId = await getOrCreateGuildFolder(guildId);
+
+  // シート作成
+  const sheetTitle = `経費申請_${guildId}_${yearMonth}`;
+  const createRes = await sheets.spreadsheets.create({
+    resource: {
+      properties: { title: sheetTitle },
+      sheets: [{ properties: { title: '申請履歴' } }]
+    },
+    fields: 'spreadsheetId'
+  });
+
+  const spreadsheetId = createRes.data.spreadsheetId;
+
+  // Driveフォルダへ移動
+  await drive.files.update({
+    fileId: spreadsheetId,
+    addParents: folderId,
+    fields: 'id, parents'
+  });
+
+  // 公開リンク設定（閲覧専用）
+  await drive.permissions.create({
+    fileId: spreadsheetId,
+    requestBody: {
+      role: 'reader',
+      type: 'anyone'
+    }
+  });
+
+  const spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}`;
+
+  // データ行を作成
+  const rows = [
+    ['ユーザー名', '日時', '経費項目', '金額', '詳細', '承認状況']
   ];
 
-  let csv = '';
-  if (!fs.existsSync(filePath)) {
-    // ヘッダー付きで新規作成
-    csv += headers.join(',') + '\n';
+  for (const e of entries) {
+    const approved = e.approvedBy?.length
+      ? `承認 (${e.approvedBy.length})：${e.approvedBy.map(a => a.username).join(', ')}`
+      : '未承認';
+
+    rows.push([
+      e.userName || '不明',
+      e.timestamp || '',
+      e.item || '',
+      e.amount ?? '',
+      e.detail || '',
+      approved
+    ]);
   }
 
-  csv += row.map(escapeCsv).join(',') + '\n';
-  fs.appendFileSync(filePath, csv, 'utf8');
+  // 合計行を追加
+  const total = entries.reduce((sum, e) => sum + (e.amount || 0), 0);
+  rows.push([]);
+  rows.push(['合計', '', '', total, '', '件数: ' + entries.length]);
 
-  return filePath;
-}
+  // 書き込み
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: '申請履歴!A1',
+    valueInputOption: 'RAW',
+    resource: {
+      values: rows
+    }
+  });
 
-// ファイル名に使えない文字を削除
-function sanitizeFileName(name) {
-  return name.replace(/[\\/:*?"<>| ]+/g, '_');
-}
-
-// 日時を yyyy-mm-dd hh:mm:ss に整形
-function formatDateTime(timestamp) {
-  const date = new Date(timestamp);
-  return date.toISOString().replace('T', ' ').slice(0, 19);
-}
-
-// CSV用にクォートする
-function escapeCsv(value) {
-  const str = String(value);
-  if (str.includes(',') || str.includes('"') || str.includes('\n')) {
-    return `"${str.replace(/"/g, '""')}"`;
-  }
-  return str;
+  return spreadsheetUrl;
 }
 
 module.exports = {
-  saveToSpreadsheet,
+  createAndSaveSpreadsheet
 };
+

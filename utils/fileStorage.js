@@ -1,39 +1,27 @@
+// utils/fileStorage.js
 const fs = require('fs');
 const path = require('path');
 require('dotenv').config();
+const { getDataPath } = require('./pathUtils.js');
+const { createAndSaveSpreadsheet } = require('./spreadsheetUtils.js'); // ← 新しく追加
 
-// ────────── ベースディレクトリ ──────────
-const BASE_DIR = path.resolve(process.env.BASE_DIR || './data/keihi');
-
+// ────────── 内部ユーティリティ ──────────
 function ensureDirExists(dirPath) {
   if (!fs.existsSync(dirPath)) {
     fs.mkdirSync(dirPath, { recursive: true });
   }
 }
 
-// ────────── パス取得ユーティリティ ──────────
-function getGuildDir(guildId) {
-  return path.join(BASE_DIR, guildId);
+function getMonth() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 }
 
-function getConfigPath(guildId) {
-  return path.join(getGuildDir(guildId), 'config.json');
-}
-
-function getLogPath(guildId, yearMonth) {
-  return path.join(getGuildDir(guildId), 'logs', `${yearMonth}.json`);
-}
-
-// ────────── JSON 読み書き ──────────
 function safeReadJson(filePath, fallback) {
   try {
     if (!fs.existsSync(filePath)) return fallback;
     const raw = fs.readFileSync(filePath, 'utf8');
     const parsed = JSON.parse(raw);
-
-    if (Array.isArray(fallback) && !Array.isArray(parsed)) return fallback;
-    if (typeof fallback === 'object' && !Array.isArray(fallback) && typeof parsed !== 'object') return fallback;
-
     return parsed;
   } catch (err) {
     console.error(`❌ JSON読み込み失敗: ${filePath}:`, err);
@@ -50,139 +38,85 @@ function saveJson(filePath, data) {
   }
 }
 
-// ────────── 設定データ管理（config.json）──────────
-const configCache = new Map();
-
-function loadGuildData(guildId) {
-  if (configCache.has(guildId)) return configCache.get(guildId);
-  const config = safeReadJson(getConfigPath(guildId), {});
-  configCache.set(guildId, config);
-  return config;
-}
-
-function saveGuildData(guildId, data) {
-  configCache.set(guildId, data);
-  saveJson(getConfigPath(guildId), data);
-}
-
-function getApproverRoles(guildId) {
-  const config = loadGuildData(guildId);
-  return config.approverRoles || [];
-}
-
-function setApproverRoles(guildId, roles) {
-  const config = loadGuildData(guildId);
-  config.approverRoles = roles;
-  saveGuildData(guildId, config);
-}
-
-// ────────── 経費エントリの構造バリデーション ──────────
-function isValidExpenseEntry(entry) {
-  return (
-    typeof entry.userId === 'string' &&
-    typeof entry.userName === 'string' &&
-    typeof entry.item === 'string' &&
-    typeof entry.amount === 'number' &&
-    typeof entry.detail === 'string' &&
-    typeof entry.timestamp === 'string' &&
-    typeof entry.threadMessageId === 'string' &&
-    Array.isArray(entry.approvedBy)
-  );
-}
-
 // ────────── 経費ログ処理 ──────────
-function appendExpenseLog(guildId, yearMonth, entry) {
-  if (!isValidExpenseEntry(entry)) {
-    console.warn('⚠️ 無効なログエントリが検出されました:', entry);
-    return;
-  }
 
-  const filePath = getLogPath(guildId, yearMonth);
+/**
+ * 経費ログを追加保存します。
+ * @param {string} guildId 
+ * @param {object} entry 
+ */
+function appendExpenseLog(guildId, entry) {
+  const logDir = getDataPath(guildId, 'logs');
+  const logFile = path.join(logDir, `${getMonth()}.json`);
+  ensureDirExists(logDir);
 
-  // 🔧 追加：必要なディレクトリを事前作成
-  ensureDirExists(getGuildDir(guildId));         // ギルドフォルダ
-  ensureDirExists(path.dirname(filePath));       // logs フォルダ
-
-  const list = safeReadJson(filePath, []);
-  list.push(entry);
-  saveJson(filePath, list);
+  const logs = safeReadJson(logFile, []);
+  logs.push(entry);
+  saveJson(logFile, logs);
 }
 
+/**
+ * 経費ログを取得します。
+ * @param {string} guildId 
+ * @param {string} yearMonth 
+ * @param {string|null} userId 
+ * @returns {Array}
+ */
 function getExpenseEntries(guildId, yearMonth, userId = null) {
-  const list = safeReadJson(getLogPath(guildId, yearMonth), []);
+  const logFile = getDataPath(guildId, 'logs', `${yearMonth}.json`);
+  const list = safeReadJson(logFile, []);
   return userId ? list.filter(e => e.userId === userId) : list;
 }
 
-function getUserExpenseEntries(guildId, yearMonth, userId) {
-  return getExpenseEntries(guildId, yearMonth, userId);
+/**
+ * 最初のスレッド/スプレッドシート付きエントリを取得
+ */
+function getFirstEntryWithLinks(guildId, yearMonth, userId) {
+  const entries = getExpenseEntries(guildId, yearMonth, userId);
+  return entries.find(e => e.threadMessageId || e.spreadsheetUrl) || null;
 }
 
-function updateApprovalStatus(guildId, yearMonth, threadMessageId, userId, username) {
-  const logPath = getLogPath(guildId, yearMonth);
-  const entries = safeReadJson(logPath, []);
-  const entry = entries.find(e => e.threadMessageId === threadMessageId);
-  if (!entry) return null;
+// ────────── スプレッドシート関連 ──────────
 
-  if (!entry.approvedBy) entry.approvedBy = [];
+/**
+ * 指定年月のスプレッドシートURLを取得（1件目）
+ */
+function getSpreadsheetUrl(guildId, yearMonth) {
+  const logFile = getDataPath(guildId, 'logs', `${yearMonth}.json`);
+  const entries = safeReadJson(logFile, []);
+  const entry = entries.find(e => e.spreadsheetUrl);
+  return entry?.spreadsheetUrl || null;
+}
 
-  const already = entry.approvedBy.find(a => a.userId === userId);
-  if (!already) {
-    entry.approvedBy.push({ userId, username });
-    saveJson(logPath, entries);
+/**
+ * URLがなければ自動生成して保存し、URLを返す
+ */
+async function getOrCreateSpreadsheetUrl(guildId, yearMonth) {
+  const existing = getSpreadsheetUrl(guildId, yearMonth);
+  if (existing) return existing;
+
+  const logFile = getDataPath(guildId, 'logs', `${yearMonth}.json`);
+  const entries = safeReadJson(logFile, []);
+
+  if (!entries.length) return null;
+
+  const newUrl = await createAndSaveSpreadsheet(guildId, yearMonth, entries);
+
+  for (const entry of entries) {
+    entry.spreadsheetUrl = newUrl;
   }
 
-  return entry.approvedBy;
+  saveJson(logFile, entries);
+  return newUrl;
 }
 
-function deleteExpenseEntry(guildId, yearMonth, messageId) {
-  const logPath = getLogPath(guildId, yearMonth);
-  const entries = safeReadJson(logPath, []);
-  const filtered = entries.filter(e => e.threadMessageId !== messageId);
-  if (filtered.length !== entries.length) {
-    saveJson(logPath, filtered);
-    return true;
-  }
-  return false;
-}
+// ────────── エクスポート ──────────
 
-function editExpenseEntry(guildId, yearMonth, messageId, newData) {
-  const logPath = getLogPath(guildId, yearMonth);
-  const entries = safeReadJson(logPath, []);
-  const entry = entries.find(e => e.threadMessageId === messageId);
-  if (!entry) return false;
-
-  Object.assign(entry, newData);
-  saveJson(logPath, entries);
-  return true;
-}
-
-function getAvailableExpenseFiles(guildId) {
-  const logDir = path.join(getGuildDir(guildId), 'logs');
-  try {
-    if (!fs.existsSync(logDir)) return [];
-    return fs.readdirSync(logDir)
-      .filter(f => /^\d{4}-\d{2}\.json$/.test(f))
-      .map(f => f.replace('.json', ''));
-  } catch (err) {
-    console.error(`❌ ログファイル一覧取得失敗: ${guildId}:`, err);
-    return [];
-  }
-}
-
-// ────────── Export ──────────
 module.exports = {
-  // 設定
-  loadGuildData,
-  saveGuildData,
-  getApproverRoles,
-  setApproverRoles,
-
-  // 経費ログ
   appendExpenseLog,
   getExpenseEntries,
-  getUserExpenseEntries,
-  updateApprovalStatus,
-  deleteExpenseEntry,
-  editExpenseEntry,
-  getAvailableExpenseFiles
+  getFirstEntryWithLinks,
+  getSpreadsheetUrl,
+  getOrCreateSpreadsheetUrl
 };
+

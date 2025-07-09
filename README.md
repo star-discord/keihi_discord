@@ -1,32 +1,22 @@
-# 💼 Discord 経費申請 Bot
+# 📋 経費申請 Discord Bot
 
-この Bot は Discord 上で経費申請・承認・履歴管理を行うツールです。申請データはローカル JSON に保存され、Google スプレッドシートへの出力にも対応しています。
-
----
-
-## 🔧 主な機能
-
-- `/経費申請設置`：申請ボタンを生成（モーダル入力）
-- `/経費申請履歴`：自分の履歴を年月ごとに確認（スレッド＋スプレッドシート出力）
-- `/経費申請設定`：承認ロールと表示ロールを設定（選択式）
-- ✅ 承認者がボタンで申請を承認可能（承認進捗が表示に反映）
-- 📄 Google スプレッドシート出力に対応
+STARグループ向けの経費申請自動化Botです。  
+Discord上で簡単に申請・承認・履歴確認が可能です。
 
 ---
 
-## 📁 データ構成
+## 🚀 機能一覧
 
-data/
-└── keihi/
-└── <guildId>/
-├── config.json # ギルド設定（承認ロール・表示ロール）
-├── spreadsheet_map.json # 年月ごとのスプレッドシート対応表
-└── logs/
-└── 2025-07.json # 各月の経費申請ログ
+| 機能 | 説明 |
+|------|------|
+| 📩 経費申請ボタン | フォーム入力で申請送信 |
+| 📊 申請履歴確認 | 自分の過去の申請を確認（Google Sheets連携） |
+| 📎 embed再送信 | `/経費申請embed` でボタン付き案内を再表示 |
+| 🛠 管理者向け設定 | `/経費申請設置` や `/deploy` などのセットアップコマンド |
 
 ---
 
-## 🛠️ セットアップ手順
+## 🧑‍💻 導入方法
 
 ### 1. リポジトリをクローン
 
@@ -40,80 +30,71 @@ npm install
 
 3. 環境変数 .env を作成
 
+cp .env.example .env
 
-DISCORD_TOKEN=あなたのBotトークン
-CLIENT_ID=BotのクライアントID
-GOOGLE_APPLICATION_CREDENTIALS=credentials.json
-BASE_DIR=./data/keihi
+内容を自分のBot用に書き換えてください：
 
-4. コマンドを Discord に登録
+DISCORD_TOKEN=xxx
+GOOGLE_SHEETS_CLIENT_EMAIL=xxx
+GOOGLE_SHEETS_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\\n..."
 
-npm run deploy-commands
+⚙️ 実行スクリプト
 
-5. Bot を起動
+コマンド	説明
+npm start	通常起動（Node.js）
+npm run pm2-start	PM2で起動（本番運用向け）
+npm run test	Mochaテスト実行
+./update_bot.sh	コード更新＋バックアップ＋再起動
+./init_server.sh	GCP等の初期セットアップスクリプト
 
-npm start
+💬 主なスラッシュコマンド
 
-または PM2 を使う場合：
+コマンド	対象	内容
+/経費申請設置	管理者のみ	ボタン付き案内をチャンネルに投稿
+/経費申請履歴	全員	自分の過去の申請一覧を確認
+/経費申請embed	管理者のみ	ボタン案内を再送信
+/deploy	管理者のみ	コマンドを再登録
+/help	全員	機能一覧を表示（Embed形式）
 
-npm run pm2-start
 
----------------
+📁 フォルダ構成
 
-💬 使用例
-📌 経費申請の流れ
-管理者が /経費申請設置 を実行
+keihi_discord/
+├── commands/         # スラッシュコマンド群
+├── events/           # Discordイベントハンドラー
+├── utils/            # 共通ユーティリティ関数
+├── data/             # 各ギルドのログデータ（自動生成）
+├── tests/            # Mocha + Chai テストコード
+├── .env.example      # 環境変数テンプレート
+├── index.js          # メイン起動ファイル
 
-案内メッセージに「経費申請する」ボタンが表示
 
-ユーザーがボタンを押すとモーダル入力（項目・金額・備考）
-
-月別スレッド「経費申請-YYYY-MM」に投稿
-
-チャンネルにも申請内容の通知が送信される
-
-古い案内メッセージは自動削除、最新のみ表示
-
-📜 履歴確認
-/経費申請履歴 を実行
-
-年月を選択 → 自分の申請履歴が専用スレッドに表示
-
-同時に Google スプレッドシートにも出力される
-
-🔒 承認機能
-管理者が /経費申請設定 を実行
-
-承認ロールを選択（複数可）
-
-対象ユーザーには「承認」ボタンが表示される
-
-ボタン押下で承認者名が追記され、進捗状況が見える化
-
-✅ 必要な権限・前提
-Bot に以下の権限が必要です：
-
-メッセージ送信
-
-スレッド作成
-
-メッセージ削除（案内更新時）
-
-Google Cloud Platform（GCP）にて：
-
-Google Sheets API を有効化
-
-サービスアカウントの JSON キーを取得
-
-📜 ライセンス
+📝 ライセンス
 MIT License
-(c) 2025 redstar hr <redstar.hoshir@gmail.com>
+(C) 2025 redstar hr
 
-🧩 将来の追加予定
-📎 領収書画像の添付機能
 
-💰 高額申請のアラート表示
+---
 
-📤 CSV エクスポート
+## ✅ 補足：自動生成ファイルを `.gitignore` に
 
-📊 承認済・未承認ステータスの一括管理パネル
+以下のように `.gitignore` に追記しておくと安全です：
+
+.env
+data/
+data_backup/
+
+---
+
+## ✅ README.md を GitHub に反映するには？
+
+プロジェクトルートに `README.md` を保存 → コミット → プッシュするだけです。
+
+```bash
+git add README.md
+git commit -m "📝 Add project README"
+git push origin main
+
+
+
+
