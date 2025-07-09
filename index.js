@@ -1,9 +1,9 @@
 // index.js
 const fs = require('fs');
 const path = require('path');
-const { getExpenseEntries } = require('./fileStorage.js');
-const { getDataPath } = require('./pathUtils.js');
-const { createSpreadsheet, appendEntry, initSheets } = require('./spreadsheet.js');
+const { getDataPath } = require('./utils/pathUtils.js');
+const { getExpenseEntries } = require('./utils/fileStorage.js'); // ← これを追加
+const { createSpreadsheet, appendEntry, initSheets } = require('./utils/spreadsheet.js');
 const { google } = require('googleapis');
 const drive = google.drive('v3');
 
