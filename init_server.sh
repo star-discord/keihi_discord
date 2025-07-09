@@ -1,28 +1,22 @@
 #!/bin/bash
 
-echo "🛠️ Google Cloud インスタンス初期構築 開始..."
+echo "🚀 Bot起動処理開始"
 
-# 1. パッケージ更新
-echo "🔄 パッケージ更新..."
-sudo apt update -y && sudo apt upgrade -y
-
-# 2. 基本ツールインストール
-echo "📦 必須パッケージをインストール中..."
-sudo apt install -y curl git unzip build-essential
-
-# 3. Node.js 18.x をインストール
-if ! command -v node >/dev/null; then
-  echo "⬇️ Node.js をインストール中..."
-  curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
-  sudo apt install -y nodejs
+# data存在チェック
+if [ ! -d ~/keihi_discord/data ]; then
+  echo "⚠️ data フォルダが見つかりません。空のフォルダを作成します"
+  mkdir -p ~/keihi_discord/data
+else
+  # 自動バックアップ
+  TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+  cp -r ~/keihi_discord/data ~/data_backup_$TIMESTAMP
+  echo "📂 data をバックアップしました: ~/data_backup_$TIMESTAMP"
 fi
 
-# 4. PM2 インストール
-if ! command -v pm2 >/dev/null; then
-  echo "📦 pm2 をグローバルインストール中..."
-  sudo npm install -g pm2
-fi
+# 起動
+cd ~/keihi_discord
+npm install
+pm2 start ecosystem.config.cjs
+pm2 save
 
-# 5. 完了表示
-echo "✅ 初期サーバーセットアップ完了 🎉"
-echo "👉 次は chat_gpt_bot.zip をアップロードし、update_bot.sh を実行してください。"
+echo "✅ Bot起動完了"

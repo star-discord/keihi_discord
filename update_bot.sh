@@ -1,40 +1,26 @@
-echo "📦 Bot 更新処理を開始..."
+#!/bin/bash
 
-# PM2 Bot 停止
-echo "🛑 Bot 停止..."
-pm2 stop 経費申請bot
+echo "📦 Bot更新開始"
 
-# 古い Bot ディレクトリ削除
-echo "🧹 古い Bot ディレクトリを削除..."
-rm -rf ~/keihi_discord_bot
+# 停止
+pm2 stop ecosystem.config.cjs
 
-# ZIP 展開
-echo "📂 ZIP 解凍..."
-unzip -q ~/経費申請bot.zip -d ~/keihi_discord_bot_tmp
+# data バックアップ
+TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+cp -r ~/keihi_discord/data ~/data_backup_$TIMESTAMP
+echo "✅ data バックアップ: data_backup_$TIMESTAMP"
 
-# 入れ子解消
-mv ~/keihi_discord_bot_tmp/keihi_discord_bot ~/keihi_discord_bot
-rm -rf ~/keihi_discord_bot_tmp
+# ZIP 解凍 & 上書き
+unzip -o ~/経費申請bot.zip -d ~
+rm -rf ~/keihi_discord
+mv ~/経費申請bot ~/keihi_discord
+cp -r ~/data_backup_$TIMESTAMP ~/keihi_discord/data
 
-# 依存インストール
-cd ~/keihi_discord_bot
+# 再構築
+cd ~/keihi_discord
 npm install
-
-# コマンドデプロイ
-if [ -f "deploy-commands.js" ]; then
-  node deploy-commands.js
-else
-  echo "⚠️ deploy-commands.js が見つかりません。スキップします。"
-fi
-
-# PM2 再起動
-echo "🚀 PM2 再起動..."
-pm2 start index.js --name 経費申請bot
+pm2 start ecosystem.config.cjs
 pm2 save
 
-# 最後に ZIP を削除！
-echo "🗑️ ZIP を削除..."
-rm -f ~/経費申請bot.zip
-
-echo "✅ Bot 更新完了 🎉"
+echo "✅ Bot更新完了"
 

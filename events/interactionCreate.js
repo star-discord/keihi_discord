@@ -1,58 +1,62 @@
-// events/interactionCreate.js
-const handleButton = require('../interactions/buttonHandler.js');
-const handleModal = require('../interactions/modalHandler.js');
-const handleSelectMenu = require('../interactions/selectMenuHandler.js');
+// index.js
+const fs = require('fs');
+const path = require('path');
+const { Client, Collection, GatewayIntentBits, Partials } = require('discord.js');
+require('dotenv').config();
 
-function timestamp() {
-  return new Date().toISOString();
-}
+// ✅ クライアント初期化
+const client = new Client({
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
+  ],
+  partials: [Partials.Channel],
+});
 
-module.exports = {
-  name: 'interactionCreate',
-  async execute(interaction, client) {
-    try {
-      const userTag = interaction.user?.tag ?? '不明ユーザー';
+// ✅ コマンドを読み込むコレクションを初期化
+client.commands = new Collection();
 
-      if (interaction.isChatInputCommand()) {
-        console.log(`[${timestamp()}] 🟢 [Command] ${interaction.commandName} by ${userTag}`);
-        const command = client.commands.get(interaction.commandName);
-        if (!command) {
-          console.warn(`[${timestamp()}] ⚠️ コマンドが見つかりません: ${interaction.commandName}`);
-          return;
-        }
-        return await command.execute(interaction, client);
-      }
+// ✅ コマンドディレクトリ読み込み（機能別に整理された構成）
+const commandsPath = path.join(__dirname, 'commands');
+const commandCategories = fs.readdirSync(commandsPath);
 
-      if (interaction.isButton()) {
-        console.log(`[${timestamp()}] 🔘 [Button] ${interaction.customId} by ${userTag}`);
-        return handleButton(interaction, client);
-      }
+for (const category of commandCategories) {
+  const categoryPath = path.join(commandsPath, category);
+  const commandFiles = fs
+    .readdirSync(categoryPath)
+    .filter(file => file.endsWith('.js') && file !== 'index.js');
 
-      if (interaction.isModalSubmit()) {
-        console.log(`[${timestamp()}] 📝 [Modal] ${interaction.customId} by ${userTag}`);
-        return handleModal(interaction, client);
-      }
-
-      if (interaction.isStringSelectMenu()) {
-        console.log(`[${timestamp()}] 📑 [SelectMenu] ${interaction.customId} by ${userTag}`);
-        return handleSelectMenu(interaction, client);
-      }
-
-      console.log(`[${timestamp()}] ❔ [Unknown Interaction] type=${interaction.type} by ${userTag}`);
-
-    } catch (err) {
-      console.error(`[${timestamp()}] ❌ interactionCreate エラー:`, err);
-
-      try {
-        const replyContent = { content: '⚠️ エラーが発生しました。', ephemeral: true };
-        if (interaction.replied || interaction.deferred) {
-          await interaction.followUp(replyContent);
-        } else {
-          await interaction.reply(replyContent);
-        }
-      } catch (e) {
-        console.error(`[${timestamp()}] ⚠️ エラーレスポンス送信に失敗:`, e);
-      }
+  for (const file of commandFiles) {
+    const filePath = path.join(categoryPath, file);
+    const command = require(filePath);
+    if (command.data && command.execute) {
+      const commandName = command.data.name || path.parse(file).name;
+      client.commands.set(commandName, command);
+      console.log(`✅ [index] コマンド読み込み成功: ${category}/${file}`);
+    } else {
+      console.warn(`⚠️ [index] コマンド形式エラー: ${category}/${file}`);
     }
   }
-};
+}
+
+// ✅ イベント読み込み
+const eventsPath = path.join(__dirname, 'events');
+const eventFiles = fs.readdirSync(eventsPath).filter(file => file.endsWith('.js'));
+
+for (const file of eventFiles) {
+  const event = require(path.join(eventsPath, file));
+  if (event.once) {
+    client.once(event.name, (...args) => event.execute(...args, client));
+  } else {
+    client.on(event.name, (...args) => event.execute(...args, client));
+  }
+  console.log(`✅ [index] イベント登録: ${file}`);
+}
+
+// ✅ 起動処理
+client.login(process.env.DISCORD_TOKEN).then(() => {
+  console.log('🚀 Botログイン成功');
+}).catch(err => {
+  console.error('❌ Botログイン失敗:', err);
+});
