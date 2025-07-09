@@ -1,34 +1,48 @@
 // deploy-commands.js
-const { REST, Routes } = require('discord.js');
-const dotenv = require('dotenv');
+const fs = require('fs');
 const path = require('path');
-const loadDeployCommands = require('./utils/loadDeployCommands.js');
 
-dotenv.config();
+/**
+ * 登録用にコマンドを .toJSON() 形式で収集する
+ * @param {string} commandsPath - commands フォルダのパス
+ * @returns {Array<Object>} JSON 形式のコマンド配列
+ */
+function loadDeployCommands(commandsPath) {
+  const commands = [];
 
-const commandsPath = path.join(__dirname, 'commands');
-const commands = loadDeployCommands(commandsPath); // すでに toJSON 済み
+  const entries = fs.readdirSync(commandsPath, { withFileTypes: true });
 
-async function deployCommands() {
-  const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
+  for (const entry of entries) {
+    let filePath;
 
-  if (commands.length === 0) {
-    console.warn('⚠️ 登録対象のコマンドがありません。');
-    return;
+    if (entry.isFile() && entry.name.endsWith('.js')) {
+      filePath = path.join(commandsPath, entry.name);
+    } else if (entry.isDirectory()) {
+      const indexPath = path.join(commandsPath, entry.name, 'index.js');
+      if (fs.existsSync(indexPath)) {
+        filePath = indexPath;
+      } else {
+        continue;
+      }
+    } else {
+      continue;
+    }
+
+    try {
+      const command = require(filePath);
+      const commandData = command.default ?? command;
+      if (commandData?.data?.toJSON) {
+        commands.push(commandData.data.toJSON());
+        console.log(`✅ コマンド登録読み込み: ${entry.name}`);
+      } else {
+        console.warn(`⚠️ toJSON 未対応のコマンドスキップ: ${entry.name}`);
+      }
+    } catch (err) {
+      console.error(`❌ コマンド読み込み失敗 (${entry.name}):`, err.message);
+    }
   }
 
-  const isDevelopment = Boolean(process.env.GUILD_ID);
-  const route = isDevelopment
-    ? Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID)
-    : Routes.applicationCommands(process.env.CLIENT_ID);
-
-  try {
-    const result = await rest.put(route, { body: commands });
-    console.log(`✅ ${isDevelopment ? '開発ギルド' : '全体'}に ${commands.length} 件のコマンドを登録しました`);
-  } catch (err) {
-    console.error('❌ コマンド登録失敗:', err);
-  }
+  return commands;
 }
 
-deployCommands();
-
+module.exports = loadDeployCommands;
