@@ -1,53 +1,43 @@
+// utils/loadCommands.js
 const fs = require('fs');
 const path = require('path');
 
 /**
- * 指定フォルダ内のすべてのコマンドを読み込む（サブフォルダ内の単一ファイル対応）
- * @param {string} commandsPath - 読み込むコマンドフォルダ（例: ./commands）
- * @param {string} mode - ログ出力モード（例: 'index', 'deploy'）
- * @returns {Array} 有効なコマンドモジュールの配列
+ * commands フォルダを再帰的に読み込み
+ * 
+ * @param {string} commandsPath - 読み込むディレクトリ
+ * @param {Object} options
+ * @param {string} [options.mode='index'] - ログ出力用
+ * @param {boolean} [options.toJSON=false] - toJSONで返すか（deploy用）
+ * @returns {Array<Object>} - コマンド配列
  */
-function loadCommands(commandsPath, mode = 'index') {
+function loadCommands(commandsPath, { mode = 'index', toJSON = false } = {}) {
   const commands = [];
 
   const entries = fs.readdirSync(commandsPath, { withFileTypes: true });
 
   for (const entry of entries) {
-    let filePath;
-    let label;
+    if (!entry.isDirectory()) continue;
 
-    if (entry.isDirectory()) {
-      // 例: keihi_embed/keihi_embed.js
-      const commandFile = path.join(commandsPath, entry.name, `${entry.name}.js`);
-      if (fs.existsSync(commandFile)) {
-        filePath = commandFile;
-        label = `${entry.name}/${entry.name}.js`;
-      } else {
-        continue;
-      }
-    } else {
-      continue; // ファイル直下は読み込まない（全てサブディレクトリ方式に統一するなら）
-    }
+    const subFile = path.join(commandsPath, entry.name, `${entry.name}.js`);
+    if (!fs.existsSync(subFile)) continue;
 
     try {
-      const command = require(filePath);
+      const command = require(subFile);
       const commandData = command.default ?? command;
 
       const name = commandData?.data?.name;
       const execute = commandData?.execute;
 
-      if (typeof name !== 'string') {
-        throw new Error(`.data.name が無効です（${typeof name}）`);
-      }
+      if (typeof name !== 'string') throw new Error(`.data.name が無効`);
+      if (typeof execute !== 'function') throw new Error(`.execute が無効`);
 
-      if (typeof execute !== 'function') {
-        throw new Error(`.execute が無効です（${typeof execute}）`);
-      }
+      const result = toJSON ? commandData.data.toJSON() : commandData;
+      commands.push(result);
 
-      commands.push(commandData);
-      console.log(`✅ [${mode}] コマンド読み込み成功: ${label}`);
+      console.log(`✅ [${mode}] コマンド読み込み: ${entry.name}/${entry.name}.js`);
     } catch (err) {
-      console.error(`❌ [${mode}] コマンド読み込み失敗 (${label}):`, err.message);
+      console.error(`❌ [${mode}] 読み込み失敗 (${entry.name}):`, err.message);
     }
   }
 
@@ -55,3 +45,4 @@ function loadCommands(commandsPath, mode = 'index') {
 }
 
 module.exports = loadCommands;
+
