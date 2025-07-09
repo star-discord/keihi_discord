@@ -38,13 +38,27 @@ module.exports = async function handleApproveButton(interaction) {
   const approverNames = approvedBy.map(a => a.username).join(', ');
   const max = approverRoles.length || 1;
   const progress = `(${approvedBy.length}/${max})`;
-
   const newContent = `✅ 承認 ${progress}：${approverNames}`;
+
+  // ✅ ボタン状態更新
+  const currentComponents = interaction.message.components;
+  const newComponents = currentComponents.map(row => {
+    const newRow = new ActionRowBuilder();
+    newRow.addComponents(
+      row.components.map(btn => {
+        if (btn.customId === 'approve_button') {
+          return ButtonBuilder.from(btn).setDisabled(approvedBy.length >= max);
+        }
+        return btn;
+      })
+    );
+    return newRow;
+  });
 
   try {
     await interaction.update({
       content: newContent,
-      components: interaction.message.components
+      components: newComponents
     });
   } catch (err) {
     console.error('❌ 承認メッセージ更新失敗:', err);
@@ -58,3 +72,4 @@ module.exports = async function handleApproveButton(interaction) {
     }
   }
 };
+

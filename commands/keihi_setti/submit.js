@@ -38,7 +38,7 @@ module.exports = async function handleModalSubmit(interaction) {
     const channelName = interaction.channel.name;
     const guildName = interaction.guild.name;
     const now = new Date();
-    const yearMonth = now.toISOString().slice(0, 7); // "2025-07"
+    const yearMonth = now.toISOString().slice(0, 7);
     const approverRoles = getApproverRoles(guildId);
 
     // 🔷 スレッドに送るエンベッド
@@ -66,12 +66,27 @@ module.exports = async function handleModalSubmit(interaction) {
       )
       .setTimestamp(now);
 
+    // ✅ ボタン定義
     const approveButton = new ButtonBuilder()
       .setCustomId('approve_button')
       .setLabel('✅ 承認する')
       .setStyle(ButtonStyle.Success);
 
-    const rowWithButton = new ActionRowBuilder().addComponents(approveButton);
+    const editButton = new ButtonBuilder()
+      .setCustomId('edit_button')
+      .setLabel('🖊️ 修正する')
+      .setStyle(ButtonStyle.Secondary);
+
+    const cancelButton = new ButtonBuilder()
+      .setCustomId('cancel_button')
+      .setLabel('🗑️ 取り消す')
+      .setStyle(ButtonStyle.Danger);
+
+    const rowWithButton = new ActionRowBuilder().addComponents(
+      approveButton,
+      editButton,
+      cancelButton
+    );
 
     // 📂 スレッド作成（または既存再利用）
     const allEntries = getExpenseEntries(guildId, yearMonth);
@@ -89,7 +104,7 @@ module.exports = async function handleModalSubmit(interaction) {
       });
     }
 
-    // 📩 スレッドに申請内容のみ送信（ボタンなし）
+    // 📩 スレッドに申請内容を送信（ボタンなし）
     const threadMessage = await targetThread.send({
       content: '📝 以下の内容で申請されました：',
       embeds: [threadEmbed]
