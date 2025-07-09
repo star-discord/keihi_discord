@@ -3,7 +3,7 @@ const path = require('path');
 
 /**
  * commands フォルダを再帰的に読み込み
- *
+ * 
  * @param {string} commandsPath - 読み込むディレクトリ
  * @param {Object} options
  * @param {string} [options.mode='index'] - ログ出力用
@@ -13,38 +13,40 @@ const path = require('path');
 function loadCommands(commandsPath, { mode = 'index', toJSON = false } = {}) {
   const commands = [];
 
-  function walk(dir) {
-    const entries = fs.readdirSync(dir, { withFileTypes: true });
+  const entries = fs.readdirSync(commandsPath, { withFileTypes: true });
 
-    for (const entry of entries) {
-      const fullPath = path.join(dir, entry.name);
+  for (const entry of entries) {
+    const subdir = path.join(commandsPath, entry.name);
 
-      if (entry.isDirectory()) {
-        walk(fullPath); // 再帰的にディレクトリ探索
-      } else if (entry.isFile() && entry.name.endsWith('.js')) {
-        try {
-          const command = require(fullPath);
-          const commandData = command.default ?? command;
+    if (!entry.isDirectory()) continue;
 
-          const name = commandData?.data?.name;
-          const execute = commandData?.execute;
+    const files = fs.readdirSync(subdir).filter(f => f.endsWith('.js'));
 
-          if (typeof name !== 'string') throw new Error(`.data.name が無効`);
-          if (typeof execute !== 'function') throw new Error(`.execute が無効`);
+    for (const file of files) {
+      const fullPath = path.join(subdir, file);
+      try {
+        // 開発時のキャッシュクリア（必要に応じて）
+        delete require.cache[require.resolve(fullPath)];
 
-          const result = toJSON ? commandData.data.toJSON() : commandData;
-          commands.push(result);
+        const command = require(fullPath);
+        const commandData = command.default ?? command;
 
-          const relativePath = path.relative(commandsPath, fullPath);
-          console.log(`✅ [${mode}] コマンド読み込み: ${relativePath}`);
-        } catch (err) {
-          console.error(`❌ [${mode}] 読み込み失敗 (${entry.name}):`, err.message);
+        // スラッシュコマンドでなければスキップして警告を出す
+        if (!commandData?.data?.name || typeof commandData.execute !== 'function') {
+          console.warn(`⚠️ [${mode}] スキップ: ${entry.name}/${file}（スラッシュコマンドではない）`);
+          continue;
         }
+
+        const result = toJSON ? commandData.data.toJSON() : commandData;
+        commands.push(result);
+
+        console.log(`✅ [${mode}] コマンド読み込み: ${entry.name}/${file}`);
+      } catch (err) {
+        console.error(`❌ [${mode}] 読み込み失敗 (${file}):`, err.message);
       }
     }
   }
 
-  walk(commandsPath);
   return commands;
 }
 
