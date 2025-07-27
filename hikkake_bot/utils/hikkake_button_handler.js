@@ -39,6 +39,37 @@ module.exports = {
     }
     // --- End of new handler ---
 
+    // --- Reaction settings button handler ---
+    const reactionMatch = interaction.customId.match(/^set_react_(quest|tosu|horse)_(num|count)$/);
+    if (reactionMatch) {
+      const [, type, key] = reactionMatch;
+      const keyLabel = key === 'num' ? '人数' : '本数';
+      const keyPlaceholder = key === 'num' ? '例: 1人' : '例: 3本';
+
+      const modal = new ModalBuilder()
+        .setCustomId(`hikkake_reaction_submit_${type}_${key}`)
+        .setTitle(`【${type.toUpperCase()}】${keyLabel}別 反応文設定`);
+
+      const targetInput = new TextInputBuilder()
+        .setCustomId('target_value')
+        .setLabel(`対象の${keyLabel}を入力`)
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder(keyPlaceholder)
+        .setRequired(true);
+
+      const reactionsInput = new TextInputBuilder()
+        .setCustomId('reaction_messages')
+        .setLabel('追加する反応文（改行で複数登録）')
+        .setStyle(TextInputStyle.Paragraph)
+        .setPlaceholder('例: すごい！\nやるじゃん！')
+        .setRequired(true);
+
+      modal.addComponents(new ActionRowBuilder().addComponents(targetInput), new ActionRowBuilder().addComponents(reactionsInput));
+      await interaction.showModal(modal);
+      return true;
+    }
+    // --- End of reaction settings handler ---
+
     const match = interaction.customId.match(/^hikkake_(quest|tosu|horse)_(plakama|order|leave|arrival)$/);
     if (!match) return false;
 
